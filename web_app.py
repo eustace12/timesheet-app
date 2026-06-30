@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""
+Web interface for Timesheet Generator
+Веб-интерфейс для генератора таймшитов
+"""
+
+from flask import Flask, render_template, request, send_file, jsonify
+from pathlib import Path
+from datetime import date, datetime
+import calendar
+import sys
+import os
+
+# Import generator
+from generate_timesheet import PDFTimesheetGenerator, MOLDOVAN_HOLIDAYS
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+
+# Output directory - use /tmp on Vercel (read-only filesystem except /tmp)
+if os.environ.get('VERCEL'):
+    OUTPUT_DIR = Path('/tmp/generated')
+else:
+    OUTPUT_DIR = Path(__file__).parent / 'generated'
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+@app.route('/')
+def index():
+    """Main page"""
+    current_year = datetime.now().year
+    current_month = datetime.now().month
+    
+    return render_template('index.html',
+                         current_year=current_year,
+                         current_month=current_month,
+                         months=list(calendar.month_name)[1:])
+
+
+@app.route('/generate', methods=['POST'])
+def generate_timesheet():
+    """Generate timesheet from form data"""
+    try:
+        # Get form data
+        year = int(request.form.get('year'))
+        month = int(request.form.get('month'))
+        employee_name = request.form.get('employee_name', '').strip()
+        company_name = request.form.get('company_name', 'Urchin Systems SA').strip()
+        hours_per_day = int(request.form.get('hours_per_day', 8))
+        
+        if not employee_name:
+            return jsonify({'error': 'Employee name is required'}), 400
+        
+        # Parse vacation dates
+        vacation_dates = []
+        vacation_input = request.form.get('vacation', '').strip()
+        if vacation_input:
+            for date_range in vacation_input.split(','):
+                date_range = date_range.strip()
+                if '-' in date_range:
+                    start_day, end_day = map(int, date_range.split('-'))
+                    vacation_dates.append((
+                        date(year, month, start_day),
+                        date(year, month, end_day)
+                    ))
+                else:
+                    day = int(date_range)
+                    single_date = date(year, month, day)
+                    vacation_dates.append((single_date, single_date))
+        
+        # Parse sick leave dates
+        sick_dates = []
+        sick_input = request.form.get('sick', '').strip()
+        if sick_input:
+            for date_range in sick_input.split(','):
+                date_range = date_range.strip()
+                if '-' in date_range:
+                    start_day, end_day = map(int, date_range.split('-'))
+                    sick_dates.append((
+                        date(year, month, start_day),
+                        date(year, month, end_day)
+                    ))
+                else:
+                    day = int(date_range)
+                    single_date = date(year, month, day)
+                    sick_dates.append((single_date, single_date))
+        
+        # Parse custom absences
+        custom_absences = {}
+        custom_days = request.form.get('custom_days', '').strip()
+        custom_reason = request.form.get('custom_reason', '').strip()
+        if custom_days and custom_reason:
+            for day_str in custom_days.split(','):
+                day = int(day_str.strip())
+                absence_date = date(year, month, day)
+                custom_absences[absence_date] = custom_reason
+        
+        # Generate timesheet
+        clean_name = employee_name.replace(' ', '_')
+        month_name = calendar.month_name[month]
+        filename = f"Timesheet_{clean_name}_{year}_{month:02d}_{month_name}.pdf"
+        output_path = OUTPUT_DIR / filename
+        
+        generator = PDFTimesheetGenerator(
+            year=year,
+            month=month,
+            employee_name=employee_name,
+            company_name=company_name,
+            hours_per_day=hours_per_day,
+            vacation_dates=vacation_dates,
+            sick_dates=sick_dates,
+            custom_absences=custom_absences
+        )
+        
+        result = generator.generate(output_path)
+        
+        # On Vercel/serverless, return PDF directly (files in /tmp don't persist)
+        # Frontend will handle as blob download
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/preview', methods=['POST'])
+def preview_timesheet():
+    """Return day-by-day JSON for the frontend to render as a preview table."""
+    try:
+        year  = int(request.form.get('year'))
+        month = int(request.form.get('month'))
+        hours_per_day = int(request.form.get('hours_per_day', 8))
+        custom_reason = request.form.get('custom_reason', 'Other').strip() or 'Other'
+
+        def expand_ranges(raw):
+            days = set()
+            if not raw:
+                return days
+            for part in raw.split(','):
+                part = part.strip()
+                if not part:
+                    continue
+                if '-' in part:
+                    a, b = map(int, part.split('-', 1))
+                    days.update(range(a, b + 1))
+                else:
+                    days.add(int(part))
+            return days
+
+        vacation_days = expand_ranges(request.form.get('vacation', ''))
+        sick_days     = expand_ranges(request.form.get('sick', ''))
+        custom_days   = expand_ranges(request.form.get('custom_days', ''))
+
+        holidays_dict  = MOLDOVAN_HOLIDAYS.get(year, {})
+        month_holidays = {d.day: name for d, name in holidays_dict.items() if d.month == month}
+
+        days_in_month = calendar.monthrange(year, month)[1]
+        day_names     = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+        result_days   = []
+        working_count = 0
+        holiday_count = 0
+
+        for d in range(1, days_in_month + 1):
+            dt  = date(year, month, d)
+            dow = dt.weekday()  # 0=Mon … 6=Sun
+
+            is_weekend  = dow >= 5
+            is_holiday  = d in month_holidays
+            is_vacation = d in vacation_days
+            is_sick     = d in sick_days
+            is_custom   = d in custom_days
+
+            if is_vacation:
+                status = 'vacation'; hours = 0
+            elif is_sick:
+                status = 'sick'; hours = 0
+            elif is_custom:
+                status = 'custom'; hours = 0
+            elif is_holiday:
+                status = 'holiday'; hours = 0; holiday_count += 1
+            elif is_weekend:
+                status = 'weekend'; hours = 0
+            else:
+                status = 'working'; hours = hours_per_day; working_count += 1
+
+            result_days.append({
+                'day':          d,
+                'date_str':     f'{day_names[dow]}, {dt.strftime("%b %d")}',
+                'status':       status,
+                'hours':        hours,
+                'holiday_name': month_holidays.get(d),
+                'custom_reason': custom_reason if is_custom else None,
+            })
+
+        return jsonify({
+            'month': calendar.month_name[month],
+            'year':  year,
+            'days':  result_days,
+            'summary': {
+                'total_days':    days_in_month,
+                'working_days':  working_count,
+                'total_hours':   working_count * hours_per_day,
+                'vacation_days': len(vacation_days),
+                'sick_days':     len(sick_days),
+                'custom_days':   len(custom_days),
+                'holiday_days':  holiday_count,
+            },
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Download generated PDF (legacy route - files may not exist on serverless)"""
+    file_path = OUTPUT_DIR / filename
+    if file_path.exists():
+        return send_file(file_path, as_attachment=True)
+    return "File not found. On serverless platforms, files must be downloaded immediately after generation.", 404
+
+
+@app.route('/holidays/<int:year>')
+def get_holidays(year):
+    """Get holidays for a specific year"""
+    holidays_dict = MOLDOVAN_HOLIDAYS.get(year, {})
+    holidays_list = []
+    
+    for holiday_date, holiday_name in holidays_dict.items():
+        holidays_list.append({
+            'date': holiday_date.isoformat(),
+            'day': holiday_date.day,
+            'month': holiday_date.month,
+            'name': holiday_name
+        })
+    
+    return jsonify(holidays_list)
+
+
+if __name__ == '__main__':
+    print("🌐 Starting Timesheet Generator Web Interface...")
+    print("📍 Open in browser: http://localhost:8080")
+    print("Press Ctrl+C to stop")
+    app.run(debug=True, host='0.0.0.0', port=8080)
+

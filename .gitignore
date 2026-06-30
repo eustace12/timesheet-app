@@ -1,0 +1,7 @@
+*.pdf
+__pycache__/
+generated/
+.vercel/
+.env
+.env.*
+.DS_Store

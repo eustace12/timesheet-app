@@ -1,0 +1,26 @@
+# Ignore generated PDFs
+*.pdf
+generated/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Local development files
+.env
+.env.local
+.venv
+venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
