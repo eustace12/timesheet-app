@@ -9,6 +9,8 @@ import calendar
 import sys
 from datetime import datetime, date
 from pathlib import Path
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import mm
@@ -16,59 +18,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 
-
-# Moldovan Public Holidays — Sărbători legale în Republica Moldova
-
-MOLDOVAN_HOLIDAYS_2025 = {
-    date(2025, 1, 1):  "New Year",
-    date(2025, 1, 7):  "Orthodox Christmas",
-    date(2025, 1, 8):  "Orthodox Christmas",
-    date(2025, 3, 8):  "International Women's Day",
-    date(2025, 4, 20): "Orthodox Easter",
-    date(2025, 4, 21): "Orthodox Easter Monday",
-    date(2025, 5, 1):  "Labour Day",
-    date(2025, 5, 9):  "Victory Day",
-    date(2025, 8, 27): "Independence Day",
-    date(2025, 8, 31): "Romanian Language Day",
-    date(2025, 10, 14):"Chisinau City Day",
-    date(2025, 12, 25):"Christmas",
-}
-
-MOLDOVAN_HOLIDAYS_2026 = {
-    date(2026, 1, 1):  "New Year",
-    date(2026, 1, 7):  "Orthodox Christmas",
-    date(2026, 1, 8):  "Orthodox Christmas",
-    date(2026, 3, 8):  "International Women's Day",
-    date(2026, 4, 12): "Orthodox Easter",
-    date(2026, 4, 13): "Orthodox Easter Monday",
-    date(2026, 5, 1):  "Labour Day",
-    date(2026, 5, 9):  "Victory Day",
-    date(2026, 8, 27): "Independence Day",
-    date(2026, 8, 31): "Romanian Language Day",
-    date(2026, 10, 14):"Chisinau City Day",
-    date(2026, 12, 25):"Christmas",
-}
-
-MOLDOVAN_HOLIDAYS_2027 = {
-    date(2027, 1, 1):  "New Year",
-    date(2027, 1, 7):  "Orthodox Christmas",
-    date(2027, 1, 8):  "Orthodox Christmas",
-    date(2027, 3, 8):  "International Women's Day",
-    date(2027, 5, 1):  "Labour Day",
-    date(2027, 5, 2):  "Orthodox Easter",
-    date(2027, 5, 3):  "Orthodox Easter Monday",
-    date(2027, 5, 9):  "Victory Day",
-    date(2027, 8, 27): "Independence Day",
-    date(2027, 8, 31): "Romanian Language Day",
-    date(2027, 10, 14):"Chisinau City Day",
-    date(2027, 12, 25):"Christmas",
-}
-
-MOLDOVAN_HOLIDAYS = {
-    2025: MOLDOVAN_HOLIDAYS_2025,
-    2026: MOLDOVAN_HOLIDAYS_2026,
-    2027: MOLDOVAN_HOLIDAYS_2027,
-}
+from moldova_holidays import get_moldova_holidays
 
 
 class PDFTimesheetGenerator:
@@ -98,7 +48,7 @@ class PDFTimesheetGenerator:
         
         all_days = []
         working_days_count = 0
-        holidays_dict = MOLDOVAN_HOLIDAYS.get(self.year, {})
+        holidays_dict = get_moldova_holidays(self.year)
         
         for day in range(1, num_days + 1):
             current_date = datetime(self.year, self.month, day)
@@ -334,6 +284,193 @@ class PDFTimesheetGenerator:
         }
 
 
+# Excel styling — mirrors PDF color scheme
+_XLSX_COLORS = {
+    'title_bg': '1F4E78',
+    'label': '44546A',
+    'accent': '1F4E78',
+    'header_bg': '4472C4',
+    'header_fg': 'FFFFFF',
+    'value_bg': 'F2F2F2',
+    'grid': 'D0D0D0',
+    'weekend_bg': 'E7E6E6',
+    'weekend_fg': '7F7F7F',
+    'vacation_bg': 'D9E9F7',
+    'vacation_fg': '4472C4',
+    'sick_bg': 'FFF2CC',
+    'sick_fg': 'C65911',
+    'custom_bg': 'FFE6F0',
+    'custom_fg': 'C00000',
+}
+
+
+class ExcelTimesheetGenerator(PDFTimesheetGenerator):
+    """Generate timesheet as styled Excel workbook (.xlsx)."""
+
+    def _thin_border(self):
+        side = Side(style='thin', color=_XLSX_COLORS['grid'])
+        return Border(left=side, right=side, top=side, bottom=side)
+
+    def _fill(self, hex_color):
+        return PatternFill('solid', fgColor=hex_color)
+
+    def generate(self, output_path):
+        """Generate Excel timesheet."""
+        print(f"Generating Excel timesheet for {calendar.month_name[self.month]} {self.year}...")
+
+        working_days_count, total_hours, all_days = self.get_all_days()
+        month_str = f"{calendar.month_name[self.month]} {self.year}"
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Timesheet'
+
+        thin = self._thin_border()
+        center = Alignment(horizontal='center', vertical='center')
+        left = Alignment(horizontal='left', vertical='center')
+        right = Alignment(horizontal='right', vertical='center')
+
+        # Title row
+        ws.merge_cells('A1:E1')
+        title_cell = ws['A1']
+        title_cell.value = 'MONTHLY TIMESHEET'
+        title_cell.font = Font(bold=True, size=14, color=_XLSX_COLORS['header_fg'])
+        title_cell.fill = self._fill(_XLSX_COLORS['title_bg'])
+        title_cell.alignment = center
+        title_cell.border = thin
+        ws.row_dimensions[1].height = 28
+
+        # Header info (rows 3-5)
+        header_rows = [
+            ('COMPANY:', self.company_name, 'WORK DAYS:', working_days_count),
+            ('EMPLOYEE:', self.employee_name, 'TOTAL HOURS:', total_hours),
+            ('MONTH:', month_str, '', None),
+        ]
+        for r_idx, (l1, v1, l2, v2) in enumerate(header_rows, start=3):
+            ws.cell(r_idx, 1, l1).font = Font(bold=True, color=_XLSX_COLORS['label'])
+            ws.cell(r_idx, 1).alignment = right
+            ws.cell(r_idx, 1).border = thin
+
+            c_val1 = ws.cell(r_idx, 2, v1)
+            c_val1.fill = self._fill(_XLSX_COLORS['value_bg'])
+            c_val1.alignment = left
+            c_val1.border = thin
+
+            if l2:
+                ws.cell(r_idx, 3, l2).font = Font(bold=True, color=_XLSX_COLORS['label'])
+                ws.cell(r_idx, 3).alignment = right
+                ws.cell(r_idx, 3).border = thin
+
+            if l2:
+                c_val2 = ws.cell(r_idx, 4, v2)
+                c_val2.font = Font(bold=True, color=_XLSX_COLORS['accent'])
+                c_val2.fill = self._fill(_XLSX_COLORS['value_bg'])
+                c_val2.alignment = center
+                c_val2.border = thin
+
+            for col in range(1, 5):
+                if ws.cell(r_idx, col).border is None or ws.cell(r_idx, col).border == Border():
+                    ws.cell(r_idx, col).border = thin
+
+        # Column headers (row 7)
+        headers = ['DATE', 'REGULAR HRS', 'OVERTIME HRS', 'OTHER', 'TOTAL HOURS']
+        header_row = 7
+        for col, hdr in enumerate(headers, start=1):
+            cell = ws.cell(header_row, col, hdr)
+            cell.font = Font(bold=True, color=_XLSX_COLORS['header_fg'])
+            cell.fill = self._fill(_XLSX_COLORS['header_bg'])
+            cell.alignment = center
+            cell.border = thin
+
+        # Data rows
+        data_start = header_row + 1
+        for i, day_info in enumerate(all_days):
+            row = data_start + i
+            current_date = day_info['date']
+            absence_type = day_info['absence_type']
+            is_weekend = day_info['is_weekend']
+            is_holiday = day_info['is_holiday']
+
+            date_str = current_date.strftime('%d-%b-%Y, %a')
+
+            if absence_type:
+                regular_val = day_info['absence_reason']
+                hours = 0
+            elif is_holiday:
+                regular_val = day_info['holiday_name']
+                hours = 0
+            elif is_weekend:
+                regular_val = 0
+                hours = 0
+            else:
+                regular_val = self.hours_per_day
+                hours = self.hours_per_day
+
+            row_values = [date_str, regular_val, None, None, hours]
+            for col, val in enumerate(row_values, start=1):
+                cell = ws.cell(row, col, val)
+                cell.border = thin
+                cell.alignment = center if col > 1 else left
+
+            # Row color-coding (same priority as PDF)
+            if absence_type == 'vacation':
+                bg, fg = _XLSX_COLORS['vacation_bg'], _XLSX_COLORS['vacation_fg']
+                ws.cell(row, 2).font = Font(italic=True, color=fg, size=9)
+                ws.cell(row, 2).alignment = left
+            elif absence_type == 'sick':
+                bg, fg = _XLSX_COLORS['sick_bg'], _XLSX_COLORS['sick_fg']
+                ws.cell(row, 2).font = Font(italic=True, color=fg, size=9)
+                ws.cell(row, 2).alignment = left
+            elif absence_type == 'custom':
+                bg, fg = _XLSX_COLORS['custom_bg'], _XLSX_COLORS['custom_fg']
+                ws.cell(row, 2).font = Font(italic=True, color=fg, size=9)
+                ws.cell(row, 2).alignment = left
+            elif is_weekend or is_holiday:
+                bg, fg = _XLSX_COLORS['weekend_bg'], _XLSX_COLORS['weekend_fg']
+                ws.cell(row, 2).font = Font(italic=True, color=fg)
+                if is_holiday:
+                    ws.cell(row, 2).font = Font(italic=True, color=fg, size=9)
+                    ws.cell(row, 2).alignment = left
+            else:
+                bg, fg = None, None
+
+            if bg:
+                fill = self._fill(bg)
+                for col in range(1, 6):
+                    c = ws.cell(row, col)
+                    c.fill = fill
+                    if col != 2 or absence_type is None:
+                        c.font = Font(color=fg) if fg else Font()
+
+        ws.column_dimensions['A'].width = 22
+        ws.column_dimensions['B'].width = 28
+        ws.column_dimensions['C'].width = 14
+        ws.column_dimensions['D'].width = 12
+        ws.column_dimensions['E'].width = 14
+
+        wb.save(str(output_path))
+
+        print(f"Excel generated successfully!")
+        print(f"   Month: {calendar.month_name[self.month]} {self.year}")
+        print(f"   Employee: {self.employee_name}")
+        print(f"   Working days: {working_days_count}")
+        print(f"   Total hours: {total_hours}")
+        print(f"Saved to: {output_path}")
+
+        return {
+            'working_days': working_days_count,
+            'total_hours': total_hours,
+            'file': output_path,
+        }
+
+
+def build_timesheet_filename(employee_name, year, month, ext='pdf'):
+    """Standard output filename for PDF or Excel."""
+    clean_name = employee_name.replace(' ', '_')
+    month_name = calendar.month_name[month]
+    return f"Timesheet_{clean_name}_{year}_{month:02d}_{month_name}.{ext}"
+
+
 def main():
     parser = argparse.ArgumentParser(description='Generate PDF timesheets directly')
     
@@ -346,6 +483,8 @@ def main():
     parser.add_argument('--company', default='Urchin Systems SA', help='Company name')
     parser.add_argument('--hours', type=int, default=8, help='Default hours per day')
     parser.add_argument('--output', '-o', help='Output directory')
+    parser.add_argument('--format', choices=['pdf', 'xlsx'], default='pdf',
+                        help='Output format: pdf (default) or xlsx')
     
     # Absence options
     parser.add_argument('--vacation', help='Vacation dates: "14-21" or "14-21,25-28"')
@@ -411,19 +550,20 @@ def main():
     # Generate filename
     output_dir = Path(args.output) if args.output else Path.cwd()
     output_dir.mkdir(exist_ok=True)
-    
-    clean_name = args.employee.replace(' ', '_')
-    month_name = calendar.month_name[month]
-    filename = f"Timesheet_{clean_name}_{year}_{month:02d}_{month_name}.pdf"
+
+    ext = args.format
+    filename = build_timesheet_filename(args.employee, year, month, ext)
     output_path = output_dir / filename
-    
+
+    fmt_label = 'EXCEL' if ext == 'xlsx' else 'PDF'
     print("=" * 60)
-    print("PDF TIMESHEET GENERATOR / ГЕНЕРАТОР PDF ТАЙМШИТОВ")
+    print(f"{fmt_label} TIMESHEET GENERATOR / ГЕНЕРАТОР {fmt_label} ТАЙМШИТОВ")
     print("=" * 60)
     print()
-    
+
     try:
-        generator = PDFTimesheetGenerator(
+        gen_cls = ExcelTimesheetGenerator if ext == 'xlsx' else PDFTimesheetGenerator
+        generator = gen_cls(
             year=year,
             month=month,
             employee_name=args.employee,

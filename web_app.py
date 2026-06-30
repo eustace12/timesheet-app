@@ -12,7 +12,12 @@ import sys
 import os
 
 # Import generator
-from generate_timesheet import PDFTimesheetGenerator, MOLDOVAN_HOLIDAYS
+from generate_timesheet import (
+    PDFTimesheetGenerator,
+    ExcelTimesheetGenerator,
+    build_timesheet_filename,
+)
+from moldova_holidays import get_moldova_holidays, holidays_for_api, HOLIDAY_SOURCE
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
@@ -95,13 +100,17 @@ def generate_timesheet():
                 absence_date = date(year, month, day)
                 custom_absences[absence_date] = custom_reason
         
-        # Generate timesheet
-        clean_name = employee_name.replace(' ', '_')
-        month_name = calendar.month_name[month]
-        filename = f"Timesheet_{clean_name}_{year}_{month:02d}_{month_name}.pdf"
+        # Output format
+        output_format = request.form.get('format', 'pdf').strip().lower()
+        if output_format not in ('pdf', 'xlsx'):
+            return jsonify({'error': 'Invalid format. Use pdf or xlsx.'}), 400
+
+        ext = 'xlsx' if output_format == 'xlsx' else 'pdf'
+        filename = build_timesheet_filename(employee_name, year, month, ext)
         output_path = OUTPUT_DIR / filename
-        
-        generator = PDFTimesheetGenerator(
+
+        gen_cls = ExcelTimesheetGenerator if output_format == 'xlsx' else PDFTimesheetGenerator
+        generator = gen_cls(
             year=year,
             month=month,
             employee_name=employee_name,
@@ -113,14 +122,18 @@ def generate_timesheet():
         )
         
         result = generator.generate(output_path)
-        
-        # On Vercel/serverless, return PDF directly (files in /tmp don't persist)
-        # Frontend will handle as blob download
+
+        mimetype = (
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            if output_format == 'xlsx'
+            else 'application/pdf'
+        )
+
         return send_file(
             output_path,
             as_attachment=True,
             download_name=filename,
-            mimetype='application/pdf'
+            mimetype=mimetype
         )
         
     except Exception as e:
@@ -155,7 +168,7 @@ def preview_timesheet():
         sick_days     = expand_ranges(request.form.get('sick', ''))
         custom_days   = expand_ranges(request.form.get('custom_days', ''))
 
-        holidays_dict  = MOLDOVAN_HOLIDAYS.get(year, {})
+        holidays_dict  = get_moldova_holidays(year)
         month_holidays = {d.day: name for d, name in holidays_dict.items() if d.month == month}
 
         days_in_month = calendar.monthrange(year, month)[1]
@@ -227,19 +240,12 @@ def download_file(filename):
 
 @app.route('/holidays/<int:year>')
 def get_holidays(year):
-    """Get holidays for a specific year"""
-    holidays_dict = MOLDOVAN_HOLIDAYS.get(year, {})
-    holidays_list = []
-    
-    for holiday_date, holiday_name in holidays_dict.items():
-        holidays_list.append({
-            'date': holiday_date.isoformat(),
-            'day': holiday_date.day,
-            'month': holiday_date.month,
-            'name': holiday_name
-        })
-    
-    return jsonify(holidays_list)
+    """Get holidays for a specific year (Nager.Date + supplements)."""
+    return jsonify({
+        "source": HOLIDAY_SOURCE,
+        "year": year,
+        "holidays": holidays_for_api(year),
+    })
 
 
 if __name__ == '__main__':
