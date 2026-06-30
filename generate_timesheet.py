@@ -25,12 +25,13 @@ class PDFTimesheetGenerator:
     """Generate timesheet directly to PDF"""
     
     def __init__(self, year, month, employee_name, company_name="Urchin Systems SA", hours_per_day=8, 
-                 vacation_dates=None, sick_dates=None, custom_absences=None):
+                 vacation_dates=None, sick_dates=None, custom_absences=None, holiday_scope="national"):
         self.year = year
         self.month = month
         self.employee_name = employee_name
         self.company_name = company_name
         self.hours_per_day = hours_per_day
+        self.holiday_scope = holiday_scope if holiday_scope in ("national", "all") else "national"
         self.vacation_dates = vacation_dates or []  # List of date ranges
         self.sick_dates = sick_dates or []
         self.custom_absences = custom_absences or {}  # Dict: date -> reason
@@ -48,7 +49,7 @@ class PDFTimesheetGenerator:
         
         all_days = []
         working_days_count = 0
-        holidays_dict = get_moldova_holidays(self.year)
+        holidays_dict = get_moldova_holidays(self.year, self.holiday_scope)
         
         for day in range(1, num_days + 1):
             current_date = datetime(self.year, self.month, day)

@@ -390,6 +390,21 @@
         .hint.warning { background: var(--warning-bg);    color: var(--warning); border-left: 3px solid var(--warning); }
         .hint.success { background: var(--success-bg);    color: var(--success); border-left: 3px solid var(--success); }
 
+        .holiday-status {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #F8FAFC;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .holiday-status.warn {
+            background: var(--warning-bg);
+            border-color: rgba(217, 119, 6, .25);
+            color: #92400E;
+        }
+
         .hint-label {
             font-weight: 600;
             margin-right: 4px;
@@ -985,6 +1000,17 @@
                 </div>
             </div>
 
+            <div class="field-row single" style="margin-top:12px;">
+                <div class="field">
+                    <label for="holiday_scope">Public holidays</label>
+                    <select id="holiday_scope" name="holiday_scope" aria-label="Public holidays scope">
+                        <option value="national" selected>National (recommended)</option>
+                        <option value="all">All public days (incl. regional)</option>
+                    </select>
+                </div>
+            </div>
+            <div id="holidayStatus" class="holiday-status" role="status" aria-live="polite"></div>
+
             <!-- Employee -->
             <div class="section-head" style="margin-top:20px;">Employee</div>
             <div class="field-row single">
@@ -1013,7 +1039,7 @@
                         <div class="absence-label">
                             <span class="type-dot vacation"></span> Vacation
                         </div>
-                        <button type="button" class="btn-clear" onclick="clearVacation()">Clear</button>
+                        <button type="button" class="btn-clear" onclick="clearVacation()" aria-label="Clear vacation periods">Clear</button>
                     </div>
                     <div class="absence-body">
                         <input type="hidden" id="vacation" name="vacation">
@@ -1133,8 +1159,8 @@
             </div>
 
             <div class="btn-row">
-                <button type="button" class="btn-preview" id="previewBtn" onclick="showPreview()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                <button type="submit" class="btn-generate" id="generateBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span id="generateBtnLabel">Generate PDF</span></button>
+                <button type="button" class="btn-preview" id="previewBtn" onclick="showPreview()" aria-label="Preview timesheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
+                <button type="submit" class="btn-generate" id="generateBtn" aria-label="Download timesheet file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span id="generateBtnLabel">Generate PDF</span></button>
             </div>
 
             <!-- Preview section -->
@@ -1174,6 +1200,7 @@
 /* ── State ── */
 let pickers          = null;
 let holidaysCache    = {};
+const STORAGE_KEY    = 'timesheetFormV1';
 let activeCalType    = null;  // 'vacation' | 'sick' | 'custom'
 let suppressCalClose = false; // skip onCalClose during programmatic clear()
 let vacationPeriods  = [];    // [{start: Number, end: Number}]
@@ -1221,23 +1248,116 @@ function getYM() {
     };
 }
 
-async function loadHolidays(year) {
-    if (holidaysCache[year] !== undefined) return holidaysCache[year];
+function getHolidayScope() {
+    return document.getElementById('holiday_scope')?.value || 'national';
+}
+
+function holidayCacheKey(year) {
+    return `${year}:${getHolidayScope()}`;
+}
+
+function getHolidayList(year) {
+    return holidaysCache[holidayCacheKey(year)] || [];
+}
+
+function updateHolidayStatus(meta) {
+    const el = document.getElementById('holidayStatus');
+    if (!el) return;
+    const list = meta?.holidays || meta || [];
+    const count = Array.isArray(list) ? list.length : (meta?.holidays?.length || 0);
+    const source = meta?.source || 'Nager.Date';
+    const scope = meta?.scope || getHolidayScope();
+    const fetched = meta?.fetched_at ? ` · updated ${meta.fetched_at.slice(0, 10)}` : '';
+    if (!count) {
+        el.className = 'holiday-status warn';
+        el.textContent = 'Warning: holiday data unavailable. Working days may be inaccurate.';
+        return;
+    }
+    el.className = 'holiday-status';
+    el.textContent = `${count} holidays in ${scope} scope · source: ${source}${fetched}`;
+}
+
+async function loadHolidays(year, force = false) {
+    const key = holidayCacheKey(year);
+    if (!force && holidaysCache[key] !== undefined) return holidaysCache[key];
     try {
-        const r = await fetch(`/holidays/${year}`);
+        const scope = getHolidayScope();
+        const r = await fetch(`/holidays/${year}?scope=${scope}`);
         const d = await r.json();
         const list = Array.isArray(d) ? d : (d.holidays || []);
-        holidaysCache[year] = list;
+        holidaysCache[key] = list;
+        updateHolidayStatus(d);
         return list;
     } catch (e) {
         console.error('Holidays fetch failed:', e);
-        holidaysCache[year] = [];
+        holidaysCache[key] = [];
+        updateHolidayStatus({ holidays: [], warning: 'fetch failed' });
         return [];
     }
 }
 
+function periodsFromString(str) {
+    if (!str) return [];
+    return str.split(',').map(part => {
+        const t = part.trim();
+        if (!t) return null;
+        if (t.includes('-')) {
+            const [a, b] = t.split('-').map(Number);
+            return { start: a, end: b };
+        }
+        const n = parseInt(t, 10);
+        return { start: n, end: n };
+    }).filter(Boolean);
+}
+
+function loadFormState() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        if (s.year) document.getElementById('year').value = s.year;
+        if (s.month) document.getElementById('month').value = s.month;
+        if (s.employee_name) document.getElementById('employee_name').value = s.employee_name;
+        if (s.custom_reason) document.getElementById('custom_reason').value = s.custom_reason;
+        if (s.holiday_scope) document.getElementById('holiday_scope').value = s.holiday_scope;
+        if (s.format) {
+            const radio = document.querySelector(`input[name="format"][value="${s.format}"]`);
+            if (radio) radio.checked = true;
+            updateGenerateLabel();
+        }
+        vacationPeriods = periodsFromString(s.vacation || '');
+        sickPeriods = periodsFromString(s.sick || '');
+        syncPeriodInput('vacation');
+        syncPeriodInput('sick');
+        renderPeriodBadges('vacation');
+        renderPeriodBadges('sick');
+        if (s.custom_days) setDateInput('custom_days', s.custom_days);
+    } catch (e) {
+        console.warn('Could not restore form state', e);
+    }
+}
+
+function saveFormState() {
+    try {
+        const state = {
+            year: document.getElementById('year').value,
+            month: document.getElementById('month').value,
+            employee_name: document.getElementById('employee_name').value,
+            custom_reason: document.getElementById('custom_reason').value,
+            holiday_scope: getHolidayScope(),
+            format: getSelectedFormat(),
+            vacation: document.getElementById('vacation').getAttribute('data-value') || '',
+            sick: document.getElementById('sick').getAttribute('data-value') || '',
+            custom_days: document.getElementById('custom_days').getAttribute('data-value') || '',
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+        console.warn('Could not save form state', e);
+    }
+}
+
 function getHolidayName(day, month, year) {
-    const list = holidaysCache[year] || [];
+    const list = getHolidayList(year);
     const h = list.find(h => h.month === month && h.day === day);
     return h ? h.name : null;
 }
@@ -1339,7 +1459,7 @@ function makeOnReady(isMultiple) {
         instance.calendarContainer.querySelector('.flatpickr-months').appendChild(closeBtn);
 
         const { year, month } = getYM();
-        const list = holidaysCache[year] || [];
+        const list = getHolidayList(year) || [];
         const monthHols = list.filter(h => h.month === month);
         if (monthHols.length) {
             const strip = document.createElement('div');
@@ -1478,7 +1598,7 @@ function addQuickVacation(workDays) {
     const { year, month } = getYM();
     const daysInMonth = new Date(year, month, 0).getDate();
     const hols = new Set(
-        (holidaysCache[year] || []).filter(h => h.month === month).map(h => h.day)
+        (getHolidayList(year) || []).filter(h => h.month === month).map(h => h.day)
     );
 
     // Days already in existing vacation periods
@@ -1599,12 +1719,13 @@ async function calculateStats() {
 
     await loadHolidays(year);
     const holDays = new Set(
-        (holidaysCache[year] || []).filter(h => h.month === month).map(h => h.day)
+        (getHolidayList(year) || []).filter(h => h.month === month).map(h => h.day)
     );
 
     const vacSet    = parseDaySet(document.getElementById('vacation').getAttribute('data-value') || '');
     const sickSet   = parseDaySet(document.getElementById('sick').getAttribute('data-value') || '');
     const customSet = parseDaySet(document.getElementById('custom_days').getAttribute('data-value') || '');
+    const overlap   = [...vacSet].filter(d => sickSet.has(d));
 
     let working = 0, vacDays = 0, sickDays = 0, customDays = 0;
 
@@ -1622,7 +1743,7 @@ async function calculateStats() {
         if (!weekend && !holiday && !vac && !sick && !custom) working++;
     }
 
-    return { total, working, holidays: holDays.size, vacDays, sickDays, customDays, hours: working * 8 };
+    return { total, working, holidays: holDays.size, vacDays, sickDays, customDays, hours: working * 8, overlap };
 }
 
 async function updateStats() {
@@ -1644,7 +1765,12 @@ async function updateStats() {
 
     const hint  = document.getElementById('validationHint');
     const total = s.vacDays + s.sickDays + s.customDays;
-    if (total > 0) {
+
+    if (s.overlap && s.overlap.length > 0) {
+        hint.className = 'hint warning';
+        hint.innerHTML = `<span class="hint-label">Warning:</span> Vacation and sick overlap on day(s): ${s.overlap.join(', ')}. Sick takes priority in export.`;
+        hint.style.display = 'block';
+    } else if (total > 0) {
         if (s.working < 5) {
             hint.className = 'hint warning';
             hint.innerHTML = `<span class="hint-label">Warning:</span> Only ${s.working} working days this month (${s.hours}h)`;
@@ -1657,6 +1783,7 @@ async function updateStats() {
         hint.innerHTML = `<span class="hint-label">Info:</span> Full month: ${s.working} working days = ${s.hours} hours`;
     }
     hint.style.display = 'block';
+    saveFormState();
 }
 
 /* ── Preview edit helpers ── */
@@ -1664,7 +1791,7 @@ function isDayLocked(dayNum) {
     const { year, month } = getYM();
     const dow = new Date(year, month - 1, dayNum).getDay();
     if (dow === 0 || dow === 6) return true;
-    const hols = (holidaysCache[year] || []).filter(h => h.month === month);
+    const hols = getHolidayList(year).filter(h => h.month === month);
     return hols.some(h => h.day === dayNum);
 }
 
@@ -1931,9 +2058,30 @@ async function reinit() {
 
 /* ── Bootstrap ── */
 async function init() {
+    loadFormState();
     const { year } = getYM();
     await loadHolidays(year);
     pickers = initCalendars();
+
+    const customVal = document.getElementById('custom_days').getAttribute('data-value');
+    if (customVal && pickers?.customPicker) {
+        const { year: y, month: m } = getYM();
+        const dates = [];
+        customVal.split(',').forEach(part => {
+            const t = part.trim();
+            if (!t) return;
+            if (t.includes('-')) {
+                const [a, b] = t.split('-').map(Number);
+                for (let d = a; d <= b; d++) dates.push(new Date(y, m - 1, d));
+            } else {
+                dates.push(new Date(y, m - 1, parseInt(t, 10)));
+            }
+        });
+        if (dates.length) {
+            pickers.customPicker.setDate(dates, false);
+            updateDisplay('custom', dates);
+        }
+    }
     updateStats();
 }
 
@@ -1941,6 +2089,19 @@ init();
 
 document.getElementById('year').addEventListener('change',  reinit);
 document.getElementById('month').addEventListener('change', reinit);
+document.getElementById('holiday_scope').addEventListener('change', async () => {
+    holidaysCache = {};
+    const { year } = getYM();
+    await loadHolidays(year, true);
+    updateStats();
+    saveFormState();
+});
+['employee_name', 'custom_reason'].forEach(id => {
+    document.getElementById(id).addEventListener('input', saveFormState);
+});
+document.querySelectorAll('input[name="format"]').forEach(el => {
+    el.addEventListener('change', saveFormState);
+});
 
 /* ── Form submit ── */
 document.getElementById('timesheetForm').addEventListener('submit', async e => {
