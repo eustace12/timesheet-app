@@ -395,21 +395,6 @@
         .hint.warning { background: var(--warning-bg);    color: var(--warning); border-left: 3px solid var(--warning); }
         .hint.success { background: var(--success-bg);    color: var(--success); border-left: 3px solid var(--success); }
 
-        .holiday-status {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 10px;
-            padding: 8px 12px;
-            background: #F8FAFC;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-        }
-        .holiday-status.warn {
-            background: var(--warning-bg);
-            border-color: rgba(217, 119, 6, .25);
-            color: #92400E;
-        }
-
         .hint-label {
             font-weight: 600;
             margin-right: 4px;
@@ -1005,14 +990,6 @@
                 </div>
             </div>
 
-            <div class="field-row single" style="margin-top:12px;">
-                <div class="field">
-                    <label>Public holidays</label>
-                    <p class="holiday-status" style="margin-top:6px;">National + Chișinău</p>
-                </div>
-            </div>
-            <div id="holidayStatus" class="holiday-status" role="status" aria-live="polite"></div>
-
             <!-- Employee -->
             <div class="section-head" style="margin-top:20px;">Employee</div>
             <div class="field-row single">
@@ -1258,23 +1235,6 @@ function getHolidayList(year) {
     return holidaysCache[holidayCacheKey(year)] || [];
 }
 
-function updateHolidayStatus(meta) {
-    const el = document.getElementById('holidayStatus');
-    if (!el) return;
-    const list = meta?.holidays || meta || [];
-    const count = Array.isArray(list) ? list.length : (meta?.holidays?.length || 0);
-    const source = meta?.source || 'Nager.Date';
-    const scopeLabel = meta?.scope_label || 'National + Chișinău';
-    const fetched = meta?.fetched_at ? ` · updated ${meta.fetched_at.slice(0, 10)}` : '';
-    if (!count) {
-        el.className = 'holiday-status warn';
-        el.textContent = 'Warning: holiday data unavailable. Working days may be inaccurate.';
-        return;
-    }
-    el.className = 'holiday-status';
-    el.textContent = `${count} holidays · ${scopeLabel} · source: ${source}${fetched}`;
-}
-
 async function loadHolidays(year, force = false) {
     const key = holidayCacheKey(year);
     if (!force && holidaysCache[key] !== undefined) return holidaysCache[key];
@@ -1283,12 +1243,10 @@ async function loadHolidays(year, force = false) {
         const d = await r.json();
         const list = Array.isArray(d) ? d : (d.holidays || []);
         holidaysCache[key] = list;
-        updateHolidayStatus(d);
         return list;
     } catch (e) {
         console.error('Holidays fetch failed:', e);
         holidaysCache[key] = [];
-        updateHolidayStatus({ holidays: [], warning: 'fetch failed' });
         return [];
     }
 }

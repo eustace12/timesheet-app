@@ -13,7 +13,6 @@ from web_app import OUTPUT_DIR
 def test_index_renders_form(client):
     html = client.get("/").data.decode()
     assert 'id="employee_name"' in html
-    assert "National + Chișinău" in html
 
 
 def test_download_existing_file(client, form_base):
