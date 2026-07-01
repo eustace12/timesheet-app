@@ -13,7 +13,7 @@ def test_index_and_health_and_holidays(client):
   assert hol["holidays"]
   preview = client.post(
       "/preview",
-      data={"year": "2026", "month": "6", "hours_per_day": "8", "holiday_scope": "national",
+      data={"year": "2026", "month": "6", "hours_per_day": "8",
             "vacation": "1-5", "sick": "10-12"},
   ).get_json()
   assert preview["summary"]["working_days"] < 22
