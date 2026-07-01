@@ -23,6 +23,7 @@ from moldova_holidays import (
     holidays_for_api,
     holidays_meta,
     HOLIDAY_SOURCE,
+    HOLIDAY_SCOPE_LABEL,
     warmup_holiday_cache,
 )
 
@@ -43,8 +44,7 @@ warmup_holiday_cache()
 
 
 def _parse_holiday_scope(raw: str | None) -> str:
-    scope = (raw or 'national').strip().lower()
-    return scope if scope in ('national', 'all') else 'national'
+    return 'national'
 
 
 def _check_generate_rate_limit():
@@ -290,6 +290,7 @@ def get_holidays(year):
         'source': HOLIDAY_SOURCE,
         'year': year,
         'scope': scope,
+        'scope_label': HOLIDAY_SCOPE_LABEL,
         'fetched_at': meta.get('fetched_at'),
         'holidays': holidays,
         'warning': None if holidays else 'Holiday data unavailable. Check network or try again.',

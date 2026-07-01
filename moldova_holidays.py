@@ -19,14 +19,22 @@ import certifi
 
 NAGER_URL = "https://date.nager.at/api/v3/PublicHolidays/{year}/MD"
 HOLIDAY_SOURCE = "Nager.Date"
-HolidayScope = Literal["national", "all"]
+HolidayScope = Literal["national"]
+HOLIDAY_SCOPE_LABEL = "National + Chișinău"
 
 # Law 170/2023 — often missing from third-party feeds
 SUPPLEMENTAL_FIXED = [
     (6, 1, "Children's Day"),
 ]
 
-# Regional / professional days — usually not company-wide non-working days
+# Chișinău municipal — kept with national holidays
+CHISINAU_KEYWORDS = (
+    "capital's day",
+    "chisinau",
+    "kishinev",
+)
+
+# Other regional / professional days — excluded
 REGIONAL_KEYWORDS = (
     "balti",
     "cahul",
@@ -59,14 +67,21 @@ def _normalize(text: str) -> str:
     return folded.encode("ascii", "ignore").decode().lower()
 
 
+def _is_chisinau(name: str) -> bool:
+    lower = _normalize(name)
+    if "cahul" in lower or "balti" in lower:
+        return False
+    return any(keyword in lower for keyword in CHISINAU_KEYWORDS)
+
+
 def _is_regional(name: str) -> bool:
+    if _is_chisinau(name):
+        return False
     lower = _normalize(name)
     return any(keyword in lower for keyword in REGIONAL_KEYWORDS)
 
 
 def filter_holidays(holidays: dict[date, str], scope: HolidayScope = "national") -> dict[date, str]:
-    if scope == "all":
-        return dict(holidays)
     return {d: n for d, n in holidays.items() if not _is_regional(n)}
 
 

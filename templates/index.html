@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timesheet Generator</title>
+    <title>Timesheet Generator · Urchin Systems</title>
+
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <meta name="theme-color" content="#1E3A5F">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1002,11 +1007,8 @@
 
             <div class="field-row single" style="margin-top:12px;">
                 <div class="field">
-                    <label for="holiday_scope">Public holidays</label>
-                    <select id="holiday_scope" name="holiday_scope" aria-label="Public holidays scope">
-                        <option value="national" selected>National (recommended)</option>
-                        <option value="all">All public days (incl. regional)</option>
-                    </select>
+                    <label>Public holidays</label>
+                    <p class="holiday-status" style="margin-top:6px;">National + Chișinău</p>
                 </div>
             </div>
             <div id="holidayStatus" class="holiday-status" role="status" aria-live="polite"></div>
@@ -1248,12 +1250,8 @@ function getYM() {
     };
 }
 
-function getHolidayScope() {
-    return document.getElementById('holiday_scope')?.value || 'national';
-}
-
 function holidayCacheKey(year) {
-    return `${year}:${getHolidayScope()}`;
+    return String(year);
 }
 
 function getHolidayList(year) {
@@ -1266,7 +1264,7 @@ function updateHolidayStatus(meta) {
     const list = meta?.holidays || meta || [];
     const count = Array.isArray(list) ? list.length : (meta?.holidays?.length || 0);
     const source = meta?.source || 'Nager.Date';
-    const scope = meta?.scope || getHolidayScope();
+    const scopeLabel = meta?.scope_label || 'National + Chișinău';
     const fetched = meta?.fetched_at ? ` · updated ${meta.fetched_at.slice(0, 10)}` : '';
     if (!count) {
         el.className = 'holiday-status warn';
@@ -1274,15 +1272,14 @@ function updateHolidayStatus(meta) {
         return;
     }
     el.className = 'holiday-status';
-    el.textContent = `${count} holidays in ${scope} scope · source: ${source}${fetched}`;
+    el.textContent = `${count} holidays · ${scopeLabel} · source: ${source}${fetched}`;
 }
 
 async function loadHolidays(year, force = false) {
     const key = holidayCacheKey(year);
     if (!force && holidaysCache[key] !== undefined) return holidaysCache[key];
     try {
-        const scope = getHolidayScope();
-        const r = await fetch(`/holidays/${year}?scope=${scope}`);
+        const r = await fetch(`/holidays/${year}`);
         const d = await r.json();
         const list = Array.isArray(d) ? d : (d.holidays || []);
         holidaysCache[key] = list;
@@ -1319,7 +1316,6 @@ function loadFormState() {
         if (s.month) document.getElementById('month').value = s.month;
         if (s.employee_name) document.getElementById('employee_name').value = s.employee_name;
         if (s.custom_reason) document.getElementById('custom_reason').value = s.custom_reason;
-        if (s.holiday_scope) document.getElementById('holiday_scope').value = s.holiday_scope;
         if (s.format) {
             const radio = document.querySelector(`input[name="format"][value="${s.format}"]`);
             if (radio) radio.checked = true;
@@ -1344,7 +1340,6 @@ function saveFormState() {
             month: document.getElementById('month').value,
             employee_name: document.getElementById('employee_name').value,
             custom_reason: document.getElementById('custom_reason').value,
-            holiday_scope: getHolidayScope(),
             format: getSelectedFormat(),
             vacation: document.getElementById('vacation').getAttribute('data-value') || '',
             sick: document.getElementById('sick').getAttribute('data-value') || '',
@@ -2089,13 +2084,6 @@ init();
 
 document.getElementById('year').addEventListener('change',  reinit);
 document.getElementById('month').addEventListener('change', reinit);
-document.getElementById('holiday_scope').addEventListener('change', async () => {
-    holidaysCache = {};
-    const { year } = getYM();
-    await loadHolidays(year, true);
-    updateStats();
-    saveFormState();
-});
 ['employee_name', 'custom_reason'].forEach(id => {
     document.getElementById(id).addEventListener('input', saveFormState);
 });

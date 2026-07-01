@@ -24,13 +24,11 @@ def test_holidays_2026_has_easter_and_children_day():
     assert date(2026, 6, 1) in h
 
 
-def test_national_scope_excludes_regional():
-    all_h = get_moldova_holidays(2026, "all")
+def test_national_scope_excludes_regional_keeps_chisinau():
     nat_h = get_moldova_holidays(2026, "national")
-    assert len(all_h) >= len(nat_h)
-    regional = [n for n in all_h.values() if "bălți" in n.lower() or "balti" in n.lower()]
-    if regional:
-        assert not any("bălți" in n.lower() or "balti" in n.lower() for n in nat_h.values())
+    assert date(2026, 10, 14) in nat_h  # Chișinău Capital's Day
+    assert not any("bălți" in n.lower() or "balti" in n.lower() for n in nat_h.values())
+    assert not any("cahul" in n.lower() for n in nat_h.values())
 
 
 def test_april_2026_working_days_via_preview(client):
@@ -52,6 +50,7 @@ def test_holidays_api_format(client):
     data = r.get_json()
     assert data["source"] == "Nager.Date"
     assert data["scope"] == "national"
+    assert data["scope_label"] == "National + Chișinău"
     assert len(data["holidays"]) > 0
     assert "fetched_at" in data
 

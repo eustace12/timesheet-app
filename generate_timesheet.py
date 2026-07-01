@@ -31,7 +31,7 @@ class PDFTimesheetGenerator:
         self.employee_name = employee_name
         self.company_name = company_name
         self.hours_per_day = hours_per_day
-        self.holiday_scope = holiday_scope if holiday_scope in ("national", "all") else "national"
+        self.holiday_scope = "national"
         self.vacation_dates = vacation_dates or []  # List of date ranges
         self.sick_dates = sick_dates or []
         self.custom_absences = custom_absences or {}  # Dict: date -> reason
