@@ -13,6 +13,19 @@ from web_app import OUTPUT_DIR
 def test_index_renders_form(client):
     html = client.get("/").data.decode()
     assert 'id="employee_name"' in html
+    assert 'rel="icon"' in html
+
+
+def test_favicon_endpoints(client):
+    for path in (
+        "/favicon.ico",
+        "/static/favicon.ico",
+        "/static/favicon-32x32.png",
+        "/static/apple-touch-icon.png",
+    ):
+        r = client.get(path)
+        assert r.status_code == 200, path
+        assert r.data
 
 
 def test_download_existing_file(client, form_base):

@@ -7,6 +7,7 @@
 
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
     <meta name="theme-color" content="#1E3A5F">
 
@@ -77,9 +78,9 @@
 
         /* ── HEADER ── */
         .header {
-            background: var(--primary);
+            background: linear-gradient(135deg, #1a4a8a 0%, var(--primary) 42%, #152A45 100%);
             color: white;
-            padding: 36px 40px 34px;
+            padding: 32px 40px 30px;
             position: relative;
             overflow: hidden;
         }
@@ -87,31 +88,97 @@
         .header::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 3px;
-            background: var(--accent);
+            inset: 0;
+            background:
+                radial-gradient(ellipse 70% 80% at 100% -10%, rgba(59,130,246,.28), transparent 55%),
+                radial-gradient(ellipse 50% 60% at 0% 100%, rgba(34,211,238,.12), transparent 50%);
+            pointer-events: none;
         }
 
-        .header-inner { position: relative; z-index: 1; }
+        .header::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #2563EB, #38BDF8, #22D3EE);
+        }
+
+        .header-inner {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: 0;
+        }
+
+        .header-mark {
+            flex-shrink: 0;
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            box-shadow: 0 8px 24px rgba(0,0,0,.18);
+            padding: 6px;
+            object-fit: contain;
+        }
+
+        .header-copy { min-width: 0; }
 
         .header-tag {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            background: rgba(255,255,255,.06);
-            border: 1px solid rgba(255,255,255,.1);
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: .5px;
+            gap: 7px;
+            background: linear-gradient(90deg, rgba(37,99,235,.22), rgba(34,211,238,.14));
+            border: 1px solid rgba(255,255,255,.14);
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .6px;
             text-transform: uppercase;
-            color: rgba(255,255,255,.65);
-            margin-bottom: 14px;
+            color: rgba(255,255,255,.82);
+            margin-bottom: 10px;
         }
 
-        .header h1 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 6px; }
-        .header p  { font-size: 13px; color: rgba(255,255,255,.55); font-weight: 400; }
+        .header-tag::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #38BDF8, #22D3EE);
+            box-shadow: 0 0 8px rgba(56,189,248,.8);
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -.4px;
+            margin-bottom: 5px;
+            line-height: 1.15;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: rgba(255,255,255,.58);
+            font-weight: 400;
+        }
+
+        .header-wordmark {
+            height: 28px;
+            width: auto;
+            opacity: .88;
+            filter: brightness(0) invert(1);
+            flex-shrink: 0;
+        }
 
         /* ── FORM ── */
         .form-wrap { padding: 36px 40px; }
@@ -936,6 +1003,8 @@
 
             .header    { padding: 22px 20px; }
             .header h1 { font-size: 21px; }
+            .header-wordmark { display: none; }
+            .header-mark { width: 44px; height: 44px; border-radius: 12px; }
             .form-wrap { padding: 22px 20px; }
 
             .field-row       { grid-template-columns: 1fr; gap: 12px; }
@@ -962,9 +1031,25 @@
 
     <header class="header">
         <div class="header-inner">
-            <div class="header-tag">Republic of Moldova</div>
-            <h1>Timesheet Generator</h1>
-            <p>Monthly work hours · holidays from Nager.Date (MD)</p>
+            <div class="header-brand">
+                <img
+                    class="header-mark"
+                    src="{{ url_for('static', filename='favicon-32x32.png') }}"
+                    width="52"
+                    height="52"
+                    alt="Urchin Systems"
+                >
+                <div class="header-copy">
+                    <div class="header-tag">Republic of Moldova</div>
+                    <h1>Timesheet Generator</h1>
+                    <p>Monthly work hours · Moldovan public holidays</p>
+                </div>
+            </div>
+            <img
+                class="header-wordmark"
+                src="{{ url_for('static', filename='logo.png') }}"
+                alt="Urchin Systems"
+            >
         </div>
     </header>
 

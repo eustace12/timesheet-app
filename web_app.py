@@ -7,7 +7,7 @@ Web interface for Timesheet Generator
 from collections import defaultdict
 from time import time
 
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, render_template, request, send_file, jsonify, send_from_directory
 from pathlib import Path
 from datetime import date, datetime
 import calendar
@@ -28,6 +28,7 @@ from moldova_holidays import (
 )
 
 app = Flask(__name__)
+STATIC_DIR = Path(__file__).parent / 'static'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 GENERATE_RATE_LIMIT = int(os.environ.get('GENERATE_RATE_LIMIT', '10'))
@@ -63,6 +64,11 @@ def _check_generate_rate_limit():
 def reset_rate_limit_for_tests():
     """Clear rate-limit counters (tests only)."""
     _generate_hits.clear()
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(STATIC_DIR, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 @app.route('/')
