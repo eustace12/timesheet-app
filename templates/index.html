@@ -180,6 +180,29 @@
             flex-shrink: 0;
         }
 
+        .app-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 40px;
+            background: var(--primary-light);
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .app-nav-links { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+        .app-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+        .app-nav a:hover { color: var(--primary); }
+        .app-nav a.active { color: var(--accent); background: white; }
+        .app-nav-user { color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+        .app-nav-user a { color: var(--accent); }
+
         /* ── FORM ── */
         .form-wrap { padding: 36px 40px; }
 
@@ -222,6 +245,7 @@
         }
 
         .field input::placeholder { color: var(--text-light); }
+        .field input[readonly] { background: var(--primary-light); cursor: default; }
 
         .hr { height: 1px; background: var(--border); margin: 28px 0; }
 
@@ -470,7 +494,7 @@
         /* ── BUTTON ROW ── */
         .btn-row {
             display: grid;
-            grid-template-columns: 1fr 2fr;
+            grid-template-columns: 1fr 1fr 1.6fr;
             gap: 10px;
             margin-top: 26px;
         }
@@ -1006,6 +1030,7 @@
             .header-wordmark { display: none; }
             .header-mark { width: 44px; height: 44px; border-radius: 12px; }
             .form-wrap { padding: 22px 20px; }
+            .app-nav { padding: 10px 16px; }
 
             .field-row       { grid-template-columns: 1fr; gap: 12px; }
             .stats-grid      { grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -1053,6 +1078,22 @@
         </div>
     </header>
 
+    <nav class="app-nav">
+        <div class="app-nav-links">
+            <a href="/" class="active">Timesheet</a>
+            <a href="/leave">Leave request</a>
+            {% if user and user.role == 'admin' %}
+            <a href="/admin">Inbox</a>
+            <a href="/admin/users">People</a>
+            {% endif %}
+        </div>
+        <div class="app-nav-user">
+            {% if user %}
+            {{ user.full_name }} · <a href="/logout">Log out</a>
+            {% endif %}
+        </div>
+    </nav>
+
     <div class="form-wrap">
         <form id="timesheetForm">
 
@@ -1080,7 +1121,7 @@
             <div class="field-row single">
                 <div class="field">
                     <label for="employee_name">Full Name</label>
-                    <input type="text" id="employee_name" name="employee_name" value="Iuntevici Stanislav" placeholder="Employee name" required>
+                    <input type="text" id="employee_name" name="employee_name" value="{{ user.full_name if user else 'Iuntevici Stanislav' }}" placeholder="Employee name" required readonly>
                 </div>
             </div>
 
@@ -1224,7 +1265,8 @@
 
             <div class="btn-row">
                 <button type="button" class="btn-preview" id="previewBtn" onclick="showPreview()" aria-label="Preview timesheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                <button type="submit" class="btn-generate" id="generateBtn" aria-label="Download timesheet file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span id="generateBtnLabel">Generate PDF</span></button>
+                <button type="submit" class="btn-preview" id="generateBtn" aria-label="Download timesheet file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span id="generateBtnLabel">Download copy</span></button>
+                <button type="button" class="btn-generate" id="submitBtn" aria-label="Submit timesheet to accountant">Submit to accountant</button>
             </div>
 
             <!-- Preview section -->
@@ -1294,9 +1336,7 @@ function getSelectedFormat() {
 }
 
 function updateGenerateLabel() {
-    const fmt = getSelectedFormat();
-    document.getElementById('generateBtnLabel').textContent =
-        fmt === 'xlsx' ? 'Download Excel' : 'Generate PDF';
+    document.getElementById('generateBtnLabel').textContent = 'Download copy';
 }
 
 function isDownloadResponse(ct) {
@@ -1357,7 +1397,9 @@ function loadFormState() {
         const s = JSON.parse(raw);
         if (s.year) document.getElementById('year').value = s.year;
         if (s.month) document.getElementById('month').value = s.month;
-        if (s.employee_name) document.getElementById('employee_name').value = s.employee_name;
+        if (s.employee_name && !document.getElementById('employee_name').readOnly) {
+            document.getElementById('employee_name').value = s.employee_name;
+        }
         if (s.custom_reason) document.getElementById('custom_reason').value = s.custom_reason;
         if (s.format) {
             const radio = document.querySelector(`input[name="format"][value="${s.format}"]`);
@@ -2184,6 +2226,43 @@ document.getElementById('timesheetForm').addEventListener('submit', async e => {
         } else {
             const data = await resp.json();
             throw new Error(data.error || 'Unknown error');
+        }
+    } catch (err) {
+        result.className = 'result error';
+        result.innerHTML = `<h3>Error</h3><p>${err.message}</p>`;
+    } finally {
+        btn.disabled          = false;
+        loading.style.display = 'none';
+        result.style.display  = 'block';
+    }
+});
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+    const form     = document.getElementById('timesheetForm');
+    const formData = new FormData(form);
+
+    ['vacation', 'sick', 'custom_days'].forEach(id => {
+        const val = document.getElementById(id).getAttribute('data-value') || '';
+        formData.set(id, val);
+    });
+
+    const btn     = document.getElementById('submitBtn');
+    const loading = document.getElementById('loading');
+    const result  = document.getElementById('result');
+
+    btn.disabled          = true;
+    loading.style.display = 'block';
+    result.style.display  = 'none';
+    document.getElementById('loadingText').textContent = 'Submitting…';
+
+    try {
+        const resp = await fetch('/timesheets/submit', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.ok) {
+            result.className = 'result success';
+            result.innerHTML = '<h3>Submitted</h3><p>The accountant received this timesheet and can download it.</p>';
+        } else {
+            throw new Error(data.error || 'Could not submit timesheet.');
         }
     } catch (err) {
         result.className = 'result error';

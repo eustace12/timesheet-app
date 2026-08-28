@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inbox · Urchin Systems</title>
+
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <meta name="theme-color" content="#1E3A5F">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
+</head>
+<body>
+<div class="container wide">
+    <header class="header">
+        <div class="header-inner">
+            <div class="header-brand">
+                <img
+                    class="header-mark"
+                    src="{{ url_for('static', filename='favicon-32x32.png') }}"
+                    width="52"
+                    height="52"
+                    alt="Urchin Systems"
+                >
+                <div>
+                    <h1>Accountant inbox</h1>
+                    <p>Monthly timesheets and leave requests</p>
+                </div>
+            </div>
+            <img
+                class="header-wordmark"
+                src="{{ url_for('static', filename='logo.png') }}"
+                alt="Urchin Systems"
+            >
+        </div>
+    </header>
+
+    <nav class="app-nav">
+        <div class="app-nav-links">
+            <a href="/">Timesheet</a>
+            <a href="/leave">Leave request</a>
+            {% if user and user.role == 'admin' %}
+            <a href="/admin" class="active">Inbox</a>
+            <a href="/admin/users">People</a>
+            {% endif %}
+        </div>
+        <div class="app-nav-user">
+            {% if user %}
+            {{ user.full_name }} · <a href="/logout">Log out</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="page-body">
+        <form method="get" action="/admin" class="section">
+            <div class="section-head">Period</div>
+            <div class="field-row triple">
+                <div class="field">
+                    <label for="year">Year</label>
+                    <input type="number" id="year" name="year" value="{{ year }}" min="2020" max="2030" required>
+                </div>
+                <div class="field">
+                    <label for="month">Month</label>
+                    <select id="month" name="month" required>
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if i == month|int %}selected{% endif %}>
+                            {{ months[i-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">View month</button>
+            </div>
+        </form>
+
+        <section class="section">
+            <div class="section-head">Timesheets</div>
+            {% if timesheets %}
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Period</th>
+                            <th>Hours</th>
+                            <th>Submitted</th>
+                            <th>Download</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in timesheets %}
+                        <tr>
+                            <td>{{ row.full_name }}</td>
+                            <td>{{ months[row.month - 1] }} {{ row.year }}</td>
+                            <td>{{ row.total_hours }}</td>
+                            <td>{{ row.submitted_at }}</td>
+                            <td><a href="/admin/timesheets/{{ row.id }}/download">Download</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty">No timesheets submitted for this month.</p>
+            {% endif %}
+        </section>
+
+        <section class="section">
+            <div class="section-head">Missing</div>
+            {% if missing %}
+            <ul class="missing-list">
+                {% for person in missing %}
+                <li>{{ person.full_name or person }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty">Everyone submitted</p>
+            {% endif %}
+        </section>
+
+        <section class="section">
+            <div class="section-head">Leave requests</div>
+            {% if leave_requests %}
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Type</th>
+                            <th>From</th>
+                            <th>To</th>
+                            <th>Comment</th>
+                            <th>Submitted</th>
+                            <th>Download</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in leave_requests %}
+                        <tr>
+                            <td>{{ row.full_name }}</td>
+                            <td>{{ row.leave_type }}</td>
+                            <td>{{ row.start_date }}</td>
+                            <td>{{ row.end_date }}</td>
+                            <td>{{ row.comment or '—' }}</td>
+                            <td>{{ row.submitted_at }}</td>
+                            <td><a href="/admin/leave/{{ row.id }}/download">Download</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty">No leave requests yet.</p>
+            {% endif %}
+        </section>
+    </div>
+</div>
+</body>
+</html>

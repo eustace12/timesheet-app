@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>People · Urchin Systems</title>
+
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <meta name="theme-color" content="#1E3A5F">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
+</head>
+<body>
+<div class="container">
+    <header class="header">
+        <div class="header-inner">
+            <div class="header-brand">
+                <img
+                    class="header-mark"
+                    src="{{ url_for('static', filename='favicon-32x32.png') }}"
+                    width="52"
+                    height="52"
+                    alt="Urchin Systems"
+                >
+                <div>
+                    <h1>People</h1>
+                    <p>Accounts that can submit timesheets</p>
+                </div>
+            </div>
+            <img
+                class="header-wordmark"
+                src="{{ url_for('static', filename='logo.png') }}"
+                alt="Urchin Systems"
+            >
+        </div>
+    </header>
+
+    <nav class="app-nav">
+        <div class="app-nav-links">
+            <a href="/">Timesheet</a>
+            <a href="/leave">Leave request</a>
+            {% if user and user.role == 'admin' %}
+            <a href="/admin">Inbox</a>
+            <a href="/admin/users" class="active">People</a>
+            {% endif %}
+        </div>
+        <div class="app-nav-user">
+            {% if user %}
+            {{ user.full_name }} · <a href="/logout">Log out</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="page-body">
+        <section class="section">
+            <div class="section-head">Directory</div>
+            {% if users %}
+            <div class="table-wrap">
+                <table class="data">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Full name</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in users %}
+                        <tr>
+                            <td>{{ row.username }}</td>
+                            <td>{{ row.full_name }}</td>
+                            <td>{{ row.role }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty">No people yet.</p>
+            {% endif %}
+        </section>
+
+        <section class="section">
+            <div class="section-head">Add person</div>
+            {% if error %}
+            <div class="alert error">{{ error }}</div>
+            {% endif %}
+            <form method="post" action="/admin/users">
+                <div class="field-row">
+                    <div class="field">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" name="username" autocomplete="off" required>
+                    </div>
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" autocomplete="new-password" required>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="full_name">Full name</label>
+                        <input type="text" id="full_name" name="full_name" required>
+                    </div>
+                    <div class="field">
+                        <label for="role">Role</label>
+                        <select id="role" name="role" required>
+                            <option value="employee">employee</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add person</button>
+            </form>
+        </section>
+    </div>
+</div>
+</body>
+</html>

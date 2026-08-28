@@ -5,14 +5,29 @@ Web interface for Timesheet Generator
 """
 
 from collections import defaultdict
+from functools import wraps
 from time import time
 
-from flask import Flask, render_template, request, send_file, jsonify, send_from_directory
+from flask import (
+    Flask,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+    session,
+    url_for,
+)
 from pathlib import Path
 from datetime import date, datetime
 import calendar
 import os
+import sqlite3
 
+import db
+from generate_leave import build_leave_filename, generate_leave_pdf
 from generate_timesheet import (
     PDFTimesheetGenerator,
     ExcelTimesheetGenerator,
@@ -30,18 +45,86 @@ from moldova_holidays import (
 app = Flask(__name__)
 STATIC_DIR = Path(__file__).parent / 'static'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-change-me')
 
 GENERATE_RATE_LIMIT = int(os.environ.get('GENERATE_RATE_LIMIT', '10'))
 GENERATE_RATE_WINDOW = int(os.environ.get('GENERATE_RATE_WINDOW', '60'))
 _generate_hits: dict[str, list[float]] = defaultdict(list)
 
+_JSON_AUTH_PATHS = {'/generate', '/preview', '/timesheets/submit', '/leave/submit'}
+_PUBLIC_ENDPOINTS = {'login', 'logout', 'health', 'favicon', 'static'}
+
 if os.environ.get('VERCEL'):
     OUTPUT_DIR = Path('/tmp/generated')
+    _DB_PATH = Path('/tmp/timesheet.db')
 else:
     OUTPUT_DIR = Path(__file__).parent / 'generated'
+    _DB_PATH = Path(__file__).parent / 'data' / 'timesheet.db'
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+db.configure(_DB_PATH)
+db.init_db()
+db.seed_if_empty()
+
 warmup_holiday_cache()
+
+
+def _row_dict(row):
+    return dict(row) if row is not None else None
+
+
+def current_user():
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    return _row_dict(db.get_user_by_id(user_id))
+
+
+def _unauthenticated_response():
+    if request.method == 'POST' and request.path in _JSON_AUTH_PATHS:
+        return jsonify({'error': 'Authentication required'}), 401
+    return redirect(url_for('login'))
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if app.config.get('TESTING'):
+            return view(*args, **kwargs)
+        if current_user() is None:
+            return _unauthenticated_response()
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if app.config.get('TESTING'):
+            return view(*args, **kwargs)
+        user = current_user()
+        if user is None:
+            return _unauthenticated_response()
+        if user['role'] != 'admin':
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+@app.context_processor
+def inject_user():
+    return {'user': current_user()}
+
+
+@app.before_request
+def _require_login():
+    if app.config.get('TESTING'):
+        return None
+    if request.endpoint in _PUBLIC_ENDPOINTS or request.endpoint is None:
+        return None
+    if current_user() is None:
+        return _unauthenticated_response()
+    return None
 
 
 def _parse_holiday_scope(raw: str | None) -> str:
@@ -66,17 +149,129 @@ def reset_rate_limit_for_tests():
     _generate_hits.clear()
 
 
+def _parse_date_ranges(raw, year, month):
+    dates = []
+    raw = (raw or '').strip()
+    if not raw:
+        return dates
+    for date_range in raw.split(','):
+        date_range = date_range.strip()
+        if '-' in date_range:
+            start_day, end_day = map(int, date_range.split('-'))
+            dates.append((date(year, month, start_day), date(year, month, end_day)))
+        else:
+            day = int(date_range)
+            single_date = date(year, month, day)
+            dates.append((single_date, single_date))
+    return dates
+
+
+def _timesheet_params(user=None):
+    year = int(request.form.get('year'))
+    month = int(request.form.get('month'))
+    if user:
+        employee_name = user['full_name']
+        company_name = user['company_name']
+        hours_per_day = int(user['hours_per_day'])
+    else:
+        employee_name = request.form.get('employee_name', '').strip()
+        company_name = request.form.get('company_name', 'Urchin Systems SA').strip()
+        hours_per_day = int(request.form.get('hours_per_day', 8))
+
+    vacation_raw = request.form.get('vacation', '').strip()
+    sick_raw = request.form.get('sick', '').strip()
+    custom_days_raw = request.form.get('custom_days', '').strip()
+    custom_reason = request.form.get('custom_reason', '').strip()
+
+    custom_absences = {}
+    if custom_days_raw and custom_reason:
+        for day_str in custom_days_raw.split(','):
+            day = int(day_str.strip())
+            custom_absences[date(year, month, day)] = custom_reason
+
+    output_format = request.form.get('format', 'pdf').strip().lower()
+    return {
+        'year': year,
+        'month': month,
+        'employee_name': employee_name,
+        'company_name': company_name,
+        'hours_per_day': hours_per_day,
+        'holiday_scope': _parse_holiday_scope(request.form.get('holiday_scope')),
+        'vacation_raw': vacation_raw,
+        'sick_raw': sick_raw,
+        'custom_days_raw': custom_days_raw,
+        'custom_reason': custom_reason,
+        'vacation_dates': _parse_date_ranges(vacation_raw, year, month),
+        'sick_dates': _parse_date_ranges(sick_raw, year, month),
+        'custom_absences': custom_absences,
+        'format': output_format,
+    }
+
+
+def _make_generator(params):
+    gen_cls = ExcelTimesheetGenerator if params['format'] == 'xlsx' else PDFTimesheetGenerator
+    return gen_cls(
+        year=params['year'],
+        month=params['month'],
+        employee_name=params['employee_name'],
+        company_name=params['company_name'],
+        hours_per_day=params['hours_per_day'],
+        vacation_dates=params['vacation_dates'],
+        sick_dates=params['sick_dates'],
+        custom_absences=params['custom_absences'],
+        holiday_scope=params['holiday_scope'],
+    )
+
+
+def _account_for_generate():
+    if app.config.get('TESTING'):
+        return None
+    return current_user()
+
+
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(STATIC_DIR, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user = db.authenticate(
+            request.form.get('username', ''),
+            request.form.get('password', ''),
+        )
+        if user is None:
+            return render_template('login.html', error='Invalid username or password')
+        session['user_id'] = user['id']
+        if user['role'] == 'admin':
+            return redirect(url_for('admin_page'))
+        return redirect(url_for('index'))
+    user = current_user()
+    if user:
+        if user['role'] == 'admin':
+            return redirect(url_for('admin_page'))
+        return redirect(url_for('index'))
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
 @app.route('/')
+@login_required
 def index():
+    user = current_user()
+    if user and user['role'] == 'admin':
+        return redirect(url_for('admin_page'))
     current_year = datetime.now().year
     current_month = datetime.now().month
     return render_template(
         'index.html',
+        user=user,
         current_year=current_year,
         current_month=current_month,
         months=list(calendar.month_name)[1:],
@@ -99,81 +294,29 @@ def health():
 
 
 @app.route('/generate', methods=['POST'])
+@login_required
 def generate_timesheet():
     limited = _check_generate_rate_limit()
     if limited:
         return limited
 
     try:
-        year = int(request.form.get('year'))
-        month = int(request.form.get('month'))
-        employee_name = request.form.get('employee_name', '').strip()
-        company_name = request.form.get('company_name', 'Urchin Systems SA').strip()
-        hours_per_day = int(request.form.get('hours_per_day', 8))
-        holiday_scope = _parse_holiday_scope(request.form.get('holiday_scope'))
-
-        if not employee_name:
+        params = _timesheet_params(_account_for_generate())
+        if not params['employee_name']:
             return jsonify({'error': 'Employee name is required'}), 400
-
-        vacation_dates = []
-        vacation_input = request.form.get('vacation', '').strip()
-        if vacation_input:
-            for date_range in vacation_input.split(','):
-                date_range = date_range.strip()
-                if '-' in date_range:
-                    start_day, end_day = map(int, date_range.split('-'))
-                    vacation_dates.append((date(year, month, start_day), date(year, month, end_day)))
-                else:
-                    day = int(date_range)
-                    single_date = date(year, month, day)
-                    vacation_dates.append((single_date, single_date))
-
-        sick_dates = []
-        sick_input = request.form.get('sick', '').strip()
-        if sick_input:
-            for date_range in sick_input.split(','):
-                date_range = date_range.strip()
-                if '-' in date_range:
-                    start_day, end_day = map(int, date_range.split('-'))
-                    sick_dates.append((date(year, month, start_day), date(year, month, end_day)))
-                else:
-                    day = int(date_range)
-                    single_date = date(year, month, day)
-                    sick_dates.append((single_date, single_date))
-
-        custom_absences = {}
-        custom_days = request.form.get('custom_days', '').strip()
-        custom_reason = request.form.get('custom_reason', '').strip()
-        if custom_days and custom_reason:
-            for day_str in custom_days.split(','):
-                day = int(day_str.strip())
-                custom_absences[date(year, month, day)] = custom_reason
-
-        output_format = request.form.get('format', 'pdf').strip().lower()
-        if output_format not in ('pdf', 'xlsx'):
+        if params['format'] not in ('pdf', 'xlsx'):
             return jsonify({'error': 'Invalid format. Use pdf or xlsx.'}), 400
 
-        ext = 'xlsx' if output_format == 'xlsx' else 'pdf'
-        filename = build_timesheet_filename(employee_name, year, month, ext)
+        ext = 'xlsx' if params['format'] == 'xlsx' else 'pdf'
+        filename = build_timesheet_filename(params['employee_name'], params['year'], params['month'], ext)
         output_path = OUTPUT_DIR / filename
 
-        gen_cls = ExcelTimesheetGenerator if output_format == 'xlsx' else PDFTimesheetGenerator
-        generator = gen_cls(
-            year=year,
-            month=month,
-            employee_name=employee_name,
-            company_name=company_name,
-            hours_per_day=hours_per_day,
-            vacation_dates=vacation_dates,
-            sick_dates=sick_dates,
-            custom_absences=custom_absences,
-            holiday_scope=holiday_scope,
-        )
+        generator = _make_generator(params)
         generator.generate(output_path)
 
         mimetype = (
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            if output_format == 'xlsx'
+            if params['format'] == 'xlsx'
             else 'application/pdf'
         )
         return send_file(output_path, as_attachment=True, download_name=filename, mimetype=mimetype)
@@ -183,6 +326,7 @@ def generate_timesheet():
 
 
 @app.route('/preview', methods=['POST'])
+@login_required
 def preview_timesheet():
     try:
         year = int(request.form.get('year'))
@@ -280,6 +424,7 @@ def preview_timesheet():
 
 
 @app.route('/download/<filename>')
+@login_required
 def download_file(filename):
     file_path = OUTPUT_DIR / filename
     if file_path.exists():
@@ -288,6 +433,7 @@ def download_file(filename):
 
 
 @app.route('/holidays/<int:year>')
+@login_required
 def get_holidays(year):
     scope = _parse_holiday_scope(request.args.get('scope'))
     meta = holidays_meta(year)
@@ -303,8 +449,178 @@ def get_holidays(year):
     })
 
 
+@app.route('/leave')
+@login_required
+def leave_page():
+    return render_template('leave.html', user=current_user())
+
+
+@app.route('/leave/submit', methods=['POST'])
+@login_required
+def submit_leave():
+    user = current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    try:
+        start = date.fromisoformat((request.form.get('start_date') or '').strip())
+        end = date.fromisoformat((request.form.get('end_date') or '').strip())
+    except ValueError:
+        return jsonify({'error': 'Invalid date'}), 400
+    if end < start:
+        return jsonify({'error': 'End date must be on or after start date'}), 400
+
+    leave_type = (request.form.get('leave_type') or 'Vacation').strip() or 'Vacation'
+    comment = (request.form.get('comment') or '').strip()
+    filename = build_leave_filename(user['full_name'], start, end)
+    leave_dir = OUTPUT_DIR / 'leave'
+    leave_dir.mkdir(parents=True, exist_ok=True)
+    output_path = leave_dir / filename
+    generate_leave_pdf(
+        output_path,
+        employee_name=user['full_name'],
+        company_name=user['company_name'],
+        start_date=start,
+        end_date=end,
+        leave_type=leave_type,
+        comment=comment,
+    )
+    row = db.create_leave_request(
+        user_id=user['id'],
+        start_date=start.isoformat(),
+        end_date=end.isoformat(),
+        leave_type=leave_type,
+        comment=comment,
+        filename=filename,
+    )
+    return jsonify({'ok': True, 'id': row['id']})
+
+
+@app.route('/timesheets/submit', methods=['POST'])
+@login_required
+def submit_timesheet():
+    user = current_user()
+    if not user:
+        return jsonify({'error': 'Authentication required'}), 401
+    try:
+        params = _timesheet_params(user)
+        if params['format'] not in ('pdf', 'xlsx'):
+            return jsonify({'error': 'Invalid format. Use pdf or xlsx.'}), 400
+
+        ext = 'xlsx' if params['format'] == 'xlsx' else 'pdf'
+        year = params['year']
+        month = params['month']
+        ts_dir = OUTPUT_DIR / 'timesheets'
+        ts_dir.mkdir(parents=True, exist_ok=True)
+        stem = f"ts_{user['id']}_{year}_{month:02d}"
+        filename = f'{stem}.{ext}'
+        output_path = ts_dir / filename
+
+        generator = _make_generator(params)
+        working_days, total_hours, _ = generator.get_all_days()
+        generator.generate(output_path)
+        for leftover in ts_dir.glob(f'{stem}.*'):
+            if leftover.name != filename:
+                leftover.unlink(missing_ok=True)
+
+        row = db.upsert_timesheet(
+            user_id=user['id'],
+            year=year,
+            month=month,
+            fmt=params['format'],
+            vacation=params['vacation_raw'],
+            sick=params['sick_raw'],
+            custom_days=params['custom_days_raw'],
+            custom_reason=params['custom_reason'],
+            working_days=working_days,
+            total_hours=total_hours,
+            filename=filename,
+        )
+        return jsonify({'ok': True, 'id': row['id']})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin')
+@admin_required
+def admin_page():
+    now = datetime.now()
+    try:
+        year = int(request.args.get('year', now.year))
+        month = int(request.args.get('month', now.month))
+    except (TypeError, ValueError):
+        year, month = now.year, now.month
+    if not 1 <= month <= 12:
+        month = now.month
+
+    timesheets = db.list_timesheets(year, month)
+    submitted_ids = {row['user_id'] for row in timesheets}
+    missing = [emp for emp in db.list_employees() if emp['id'] not in submitted_ids]
+    return render_template(
+        'admin.html',
+        user=current_user(),
+        year=year,
+        month=month,
+        months=list(calendar.month_name)[1:],
+        timesheets=timesheets,
+        leave_requests=db.list_leave_requests(),
+        missing=missing,
+    )
+
+
+@app.route('/admin/users', methods=['GET', 'POST'])
+@admin_required
+def admin_users():
+    error = None
+    if request.method == 'POST':
+        try:
+            db.create_user(
+                request.form.get('username', ''),
+                request.form.get('password', ''),
+                request.form.get('full_name', ''),
+                request.form.get('role', ''),
+            )
+            return redirect(url_for('admin_users'))
+        except ValueError as exc:
+            error = str(exc)
+        except sqlite3.IntegrityError:
+            error = 'Username already exists'
+    return render_template(
+        'users.html',
+        user=current_user(),
+        users=db.list_users(),
+        error=error,
+    )
+
+
+@app.route('/admin/timesheets/<int:ts_id>/download')
+@admin_required
+def download_timesheet(ts_id):
+    row = db.get_timesheet(ts_id)
+    if row is None:
+        abort(404)
+    path = OUTPUT_DIR / 'timesheets' / row['filename']
+    if not path.exists():
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=row['filename'])
+
+
+@app.route('/admin/leave/<int:leave_id>/download')
+@admin_required
+def download_leave(leave_id):
+    row = db.get_leave_request(leave_id)
+    if row is None:
+        abort(404)
+    path = OUTPUT_DIR / 'leave' / row['filename']
+    if not path.exists():
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=row['filename'])
+
+
 if __name__ == '__main__':
     print("Starting Timesheet Generator Web Interface...")
     print("Open in browser: http://localhost:8080")
+    print("Demo: admin / admin123  (accountant inbox)")
+    print("      employee / employee123")
+    print("      stanislav / employee123")
     print("Press Ctrl+C to stop")
     app.run(debug=True, host='0.0.0.0', port=8080)

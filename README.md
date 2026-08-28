@@ -47,6 +47,23 @@ python3 generate_timesheet.py --year 2025 --month 10 \
   --absence 30 "Birthday"
 ```
 
+## MVP demo (replace Zoho)
+
+Run `python3 web_app.py` and open http://localhost:8080.
+
+- **Employee** submits a monthly timesheet and leave request.
+- **Admin** (accountant) downloads submissions from Inbox.
+
+Demo logins:
+
+| User | Password | Role |
+|------|----------|------|
+| `admin` | `admin123` | accountant inbox |
+| `employee` | `employee123` | employee |
+| `stanislav` | `employee123` | employee |
+
+SQLite lives at `data/timesheet.db` (local). Vercel `/tmp` is ephemeral — demo locally for the manager. Admin can add people at `/admin/users`.
+
 ## Deploy to Vercel
 
 See [DEPLOY.md](DEPLOY.md) for detailed instructions.

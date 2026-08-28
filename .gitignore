@@ -1,6 +1,9 @@
 *.pdf
 __pycache__/
 generated/
+data/
+*.db
+.coverage
 .vercel/
 .env
 .env.*
