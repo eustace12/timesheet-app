@@ -11,7 +11,7 @@ from web_app import OUTPUT_DIR
 
 
 def test_index_renders_form(client):
-    html = client.get("/").data.decode()
+    html = client.get("/documents").data.decode()
     assert 'id="employee_name"' in html
     assert 'rel="icon"' in html
 
@@ -28,13 +28,11 @@ def test_favicon_endpoints(client):
         assert r.data
 
 
-def test_download_existing_file(client, form_base):
-    client.post("/generate", data={**form_base, "format": "pdf"})
-    filename = build_timesheet_filename("Test User", 2026, 6, "pdf")
-    assert (OUTPUT_DIR / filename).exists()
-    r = client.get(f"/download/{filename}")
-    assert r.status_code == 200
-    assert r.data[:4] == b"%PDF"
+def test_download_is_returned_directly(client, form_base):
+    response = client.post("/generate", data={**form_base, "format": "pdf"})
+    assert response.status_code == 200
+    assert response.data.startswith(b"%PDF")
+    assert build_timesheet_filename("Test User", 2026, 6, "pdf") in response.headers["Content-Disposition"]
 
 
 def test_download_missing_returns_404(client):
@@ -50,8 +48,14 @@ def test_generate_invalid_format(client, form_base):
 
 def test_preview_invalid_month_returns_error(client, form_base):
     r = client.post("/preview", data={**form_base, "month": "xx"})
-    assert r.status_code == 500
+    assert r.status_code == 400
     assert "error" in r.get_json()
+
+
+def test_generate_invalid_period_returns_client_error(client, form_base):
+    r = client.post("/generate", data={**form_base, "month": "13", "format": "pdf"})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "Invalid timesheet data."
 
 
 def test_preview_custom_absence(client, form_base):
@@ -87,6 +91,20 @@ def test_generate_with_custom_absence(client, form_base):
     wb = load_workbook(BytesIO(r.data))
     values = [c.value for row in wb.active.iter_rows() for c in row if c.value]
     assert "Training" in values
+
+
+def test_generate_accepts_custom_absence_ranges(client, form_base):
+    r = client.post(
+        "/generate",
+        data={
+            **form_base,
+            "format": "pdf",
+            "custom_days": "15-17",
+            "custom_reason": "Training",
+        },
+    )
+    assert r.status_code == 200
+    assert r.data[:4] == b"%PDF"
 
 
 def test_xlsx_contains_summary_fields(client, form_base):

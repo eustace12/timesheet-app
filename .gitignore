@@ -9,3 +9,6 @@ data/
 .env.*
 .DS_Store
 .cache/
+node_modules/
+.vercel
+.env*

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: urchin-people
+description: Company SSO-only time and leave service; external Supabase persistence.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

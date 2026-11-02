@@ -26,7 +26,7 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: var(--bg);
     min-height: 100vh;
     padding: 32px 16px 56px;
@@ -120,6 +120,7 @@ body {
     opacity: .88;
     filter: brightness(0) invert(1);
     flex-shrink: 0;
+    display: none;
 }
 
 /* ── NAV ── */
@@ -157,12 +158,52 @@ body {
 }
 
 .app-nav-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     color: var(--text-muted);
     font-weight: 500;
     white-space: nowrap;
 }
 
 .app-nav-user a { color: var(--accent); }
+
+.logout-form { display: inline; }
+
+.logout-button {
+    padding: 0;
+    border: 0;
+    color: var(--accent);
+    background: transparent;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.logout-button:hover { text-decoration: underline; }
+
+.language-switcher {
+    display: none;
+}
+
+.language-switcher select {
+    min-height: 30px;
+    padding: 5px 26px 5px 8px;
+    border: 1px solid var(--border-hover);
+    border-radius: 6px;
+    color: var(--text-muted);
+    background: white;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.language-switcher select:focus {
+    border-color: var(--accent);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--primary-ring);
+}
 
 .page-body { padding: 32px 40px 40px; }
 
@@ -187,6 +228,13 @@ body {
 
 .field-row.single { grid-template-columns: 1fr; }
 .field-row.triple { grid-template-columns: 1fr 1fr auto; align-items: end; }
+
+.period-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
 
 .field { display: flex; flex-direction: column; gap: 5px; }
 
@@ -272,6 +320,17 @@ body {
     color: var(--accent);
 }
 
+.btn-danger {
+    background: var(--danger-bg);
+    color: #B91C1C;
+    border: 1px solid rgba(220, 38, 38, .3);
+}
+
+.btn-danger:hover {
+    background: #FEE2E2;
+    border-color: rgba(220, 38, 38, .5);
+}
+
 .alert {
     margin-bottom: 16px;
     padding: 14px 16px;
@@ -341,6 +400,165 @@ table.data a {
 
 table.data a:hover { text-decoration: underline; }
 
+.action-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.action-link:hover { text-decoration: underline; }
+
+.user-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.user-actions form { margin: 0; }
+
+.field-hint {
+    margin: 6px 0 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* ── DATE PICKER ── */
+.flatpickr-calendar {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 14px 32px rgba(15, 23, 42, .18);
+    font-family: inherit;
+}
+
+.flatpickr-months .flatpickr-month,
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.flatpickr-weekdays {
+    background: var(--primary-light);
+}
+
+span.flatpickr-weekday {
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.flatpickr-day.today { border-color: var(--accent); }
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.status-submitted {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.status-accepted {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.status-needs_changes {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.review-form {
+    display: grid;
+    gap: 6px;
+    min-width: 190px;
+}
+
+.review-form select,
+.review-form textarea {
+    width: 100%;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    background: white;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    outline: none;
+}
+
+.review-form select {
+    min-height: 32px;
+    padding: 5px 8px;
+}
+
+.review-form textarea {
+    min-height: 52px;
+    padding: 7px 8px;
+    resize: vertical;
+}
+
+.review-form select:focus,
+.review-form textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--primary-ring);
+}
+
+.btn-compact {
+    justify-self: start;
+    padding: 7px 10px;
+    font-size: 12px;
+}
+
+.review-comment {
+    margin-top: 7px;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.inline-comment {
+    display: inline-block;
+    margin-top: 0;
+}
+
+.reviewed-at {
+    margin-top: 5px;
+    color: var(--text-light);
+    font-size: 11px;
+}
+
+.record-table td {
+    white-space: normal;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .empty {
     padding: 18px 4px;
     color: var(--text-muted);
@@ -407,10 +625,22 @@ body.login-page {
     .header h1 { font-size: 21px; }
     .header-wordmark { display: none; }
     .header-mark { width: 44px; height: 44px; border-radius: 12px; }
-    .app-nav { padding: 10px 16px; }
+    .app-nav {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 10px 16px;
+    }
+    .app-nav-user { white-space: normal; }
     .page-body { padding: 22px 20px; }
     .field-row,
     .field-row.triple { grid-template-columns: 1fr; }
+    .period-actions { align-items: flex-start; }
     .login-card .header { padding: 22px 20px; }
     .login-body { padding: 22px 20px 24px; }
+    .review-form { min-width: 170px; }
+    .record-table { min-width: 680px; }
 }
+
+.profile-selector { display: flex; align-items: center; gap: 8px; margin: 0; max-width: 100%; }
+.profile-selector label { font-size: 12px; color: var(--text-muted); }
+.profile-selector select { min-width: 0; max-width: 220px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--primary); font: inherit; }

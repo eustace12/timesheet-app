@@ -1,0 +1,17 @@
+{% macro status_badge(status) -%}
+<span class="status-badge status-{{ status }}">{{ {'accepted':'Approved','needs_changes':'Changes requested','submitted':'Awaiting review','draft':'Draft'}.get(status,status) }}</span>
+{%- endmacro %}
+{% macro review_form(kind, row, year, month) -%}
+{% if row.status == 'submitted' or (row.status == 'accepted' and kind == 'timesheets') %}
+<details class="review-details" {% if row.status == 'submitted' %}open{% endif %}>
+<summary>{{ 'Review request' if row.status == 'submitted' else 'Reopen for correction' }}</summary>
+<form method="post" action="/admin/{{ kind }}/{{ row.id }}/{{ 'review' if row.status == 'submitted' else 'reopen' }}" class="review-form" data-draft-label="Review comment">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="{{ month }}">
+<input type="hidden" name="expected_submitted_at" value="{{ row.submitted_at }}">
+<label for="{{ kind }}-comment-{{ row.id }}">Comment <span class="optional">required when requesting changes</span></label>
+<textarea id="{{ kind }}-comment-{{ row.id }}" name="review_comment" maxlength="1000" rows="2" placeholder="Add a useful note for {{ row.full_name }}"></textarea>
+<div class="review-actions">{% if row.status == 'submitted' %}<button type="submit" name="status" value="accepted" class="button primary">Approve</button>{% endif %}<button type="submit" name="status" value="needs_changes" class="button">{{ 'Request changes' if row.status == 'submitted' else 'Reopen for correction' }}</button></div>
+</form></details>
+{% elif row.status == 'needs_changes' %}<p class="subtle">Waiting for the employee to send a revised request.</p>
+{% else %}<p class="subtle">This request has been approved and saved.</p>{% endif %}
+{%- endmacro %}

@@ -24,3 +24,13 @@ venv/
 .DS_Store
 Thumbs.db
 
+
+# Keep local records and development artifacts out of deployment bundles.
+data/
+*.db
+.cache/
+.coverage
+.pytest_cache/
+tests/
+.github/
+scripts/

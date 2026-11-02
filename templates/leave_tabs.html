@@ -1,0 +1,5 @@
+<nav class="leave-tabs" aria-label="Time off navigation">
+  {% for path, label in [('/leave','Overview'),('/leave-balances','Balance'),('/team-calendar','Team calendar')] %}
+  <a href="{{ path }}" {% if request.path == path %}class="selected" aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

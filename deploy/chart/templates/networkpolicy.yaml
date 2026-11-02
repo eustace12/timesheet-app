@@ -1,0 +1,26 @@
+{{- $namespace := required "Set trustedProxy.namespace to the existing SSO proxy namespace" .Values.trustedProxy.namespace -}}
+{{- $labels := required "Set trustedProxy.podLabels to the exact existing SSO proxy pod labels" .Values.trustedProxy.podLabels -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: urchin-people, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: {{ $namespace | quote }}}
+          podSelector:
+            matchLabels:
+              {{- toYaml $labels | nindent 14 }}
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    # Supabase database API, private storage and the official holiday source.
+    # The cluster egress gateway may narrow destinations further.
+    - ports: [{protocol: TCP, port: 443}]

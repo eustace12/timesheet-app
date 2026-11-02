@@ -1,125 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leave request · Urchin Systems</title>
-
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
-    <meta name="theme-color" content="#1E3A5F">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
-</head>
-<body>
-<div class="container">
-    <header class="header">
-        <div class="header-inner">
-            <div class="header-brand">
-                <img
-                    class="header-mark"
-                    src="{{ url_for('static', filename='favicon-32x32.png') }}"
-                    width="52"
-                    height="52"
-                    alt="Urchin Systems"
-                >
-                <div>
-                    <h1>Leave request</h1>
-                    <p>Send a request the accountant can download</p>
-                </div>
-            </div>
-            <img
-                class="header-wordmark"
-                src="{{ url_for('static', filename='logo.png') }}"
-                alt="Urchin Systems"
-            >
-        </div>
-    </header>
-
-    <nav class="app-nav">
-        <div class="app-nav-links">
-            <a href="/">Timesheet</a>
-            <a href="/leave" class="active">Leave request</a>
-            {% if user and user.role == 'admin' %}
-            <a href="/admin">Inbox</a>
-            <a href="/admin/users">People</a>
-            {% endif %}
-        </div>
-        <div class="app-nav-user">
-            {% if user %}
-            {{ user.full_name }} · <a href="/logout">Log out</a>
-            {% endif %}
-        </div>
-    </nav>
-
-    <div class="page-body">
-        <form id="leaveForm">
-            <div class="field-row">
-                <div class="field">
-                    <label for="start_date">Start date</label>
-                    <input type="date" id="start_date" name="start_date" required>
-                </div>
-                <div class="field">
-                    <label for="end_date">End date</label>
-                    <input type="date" id="end_date" name="end_date" required>
-                </div>
-            </div>
-            <div class="field-row single">
-                <div class="field">
-                    <label for="leave_type">Leave type</label>
-                    <select id="leave_type" name="leave_type" required>
-                        <option value="Vacation">Vacation</option>
-                        <option value="Unpaid">Unpaid</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-            </div>
-            <div class="field-row single">
-                <div class="field">
-                    <label for="comment">Comment</label>
-                    <textarea id="comment" name="comment" placeholder="Optional note for the accountant"></textarea>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-primary" id="leaveSubmit">Submit leave request</button>
-        </form>
-
-        <div id="leaveResult" class="alert" style="display:none; margin-top:16px;"></div>
-    </div>
-</div>
-
-<script>
-document.getElementById('leaveForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target;
-    const btn = document.getElementById('leaveSubmit');
-    const result = document.getElementById('leaveResult');
-    btn.disabled = true;
-    result.style.display = 'none';
-
-    try {
-        const resp = await fetch('/leave/submit', {
-            method: 'POST',
-            body: new FormData(form),
-        });
-        const data = await resp.json();
-        if (data.ok) {
-            result.className = 'alert success';
-            result.innerHTML = '<h3>Submitted</h3><p>The accountant can download this leave request.</p>';
-            form.reset();
-        } else {
-            throw new Error(data.error || 'Could not submit leave request.');
-        }
-    } catch (err) {
-        result.className = 'alert error';
-        result.innerHTML = `<h3>Error</h3><p>${err.message}</p>`;
-    } finally {
-        btn.disabled = false;
-        result.style.display = 'block';
-    }
-});
-</script>
-</body>
-</html>
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time off · Urchin People</title>
+<link rel="icon" href="/static/favicon.ico"><link rel="stylesheet" data-view-style href="/static/hr.css">
+<link rel="stylesheet" href="/static/people-shell.css">
+{% include 'brand_head.html' %}
+</head><body class="people-app" data-demo-role="{{ demo_role }}">
+{% include 'app_shell.html' %}
+<main id="people-view" tabindex="-1"><div class="workspace"><div class="workspace-content">
+<div class="page-heading"><div><p class="eyebrow">A LITTLE ROOM TO RECHARGE</p><h1>Time off</h1><p class="subtle">Your leave, balance and team plans in one place.</p></div><button type="button" class="request-leave-button employee-only" data-request-leave {% if not user %}disabled{% endif %}>+ Request leave</button></div>
+{% include 'leave_tabs.html' %}
+<section class="metrics leave-overview" aria-label="Leave balance for {{ year }}">
+<article class="metric"><span>Available balance</span><strong>{{ balance.available if balance and balance.available is not none else '—' }} <small>days</small></strong><p>Ready for your next break</p></article>
+<article class="metric"><span>Annual allowance</span><strong>{{ balance.entitlement if balance and balance.entitlement is not none else '—' }} <small>days</small></strong><p>{{ year }} · working days</p></article>
+<article class="metric"><span>Approved</span><strong>{{ balance.used if balance else 0 }} <small>days</small></strong><p>Vacation already approved</p></article>
+<article class="metric"><span>Pending</span><strong>{{ balance.pending if balance else 0 }} <small>days</small></strong><p>Awaiting a review</p></article>
+</section>
+<section class="panel"><div class="panel-heading"><h2>My requests</h2><a href="/team-calendar">View team calendar →</a></div>
+<div class="table-scroll"><table><thead><tr><th>Dates</th><th>Leave type</th><th>Status</th><th>Note</th><th>Actions</th></tr></thead><tbody>
+{% for row in leave_requests %}<tr><td>{{ row.start_date|display_date }} <span class="subtle">→</span> {{ row.end_date|display_date }}</td><td>{{ 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}</td><td><span class="badge {{ row.status }}">{{ {'submitted':'Pending','accepted':'Approved','needs_changes':'Changes requested'}.get(row.status,row.status) }}</span></td><td>{{ row.review_comment or row.comment or '—' }}</td><td><div class="record-links"><a href="/history/leave/{{ row.id }}/download">Download PDF</a>{% if row.status == 'needs_changes' %}<button type="button" class="text-button" data-request-leave data-leave-copy='{{ {"start_date":row.start_date,"end_date":row.end_date,"leave_type":row.leave_type,"comment":row.comment}|tojson }}'>Prepare a revised request →</button>{% endif %}</div></td></tr>
+{% else %}<tr><td colspan="5" class="empty"><strong>Your next break starts here.</strong><p>When you request leave, you can follow its status here.</p><button class="request-leave-button" type="button" data-request-leave {% if not user %}disabled{% endif %}>Request leave</button></td></tr>{% endfor %}
+</tbody></table></div></section>
+</div></div></main></body></html>

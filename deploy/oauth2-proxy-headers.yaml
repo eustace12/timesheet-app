@@ -1,0 +1,17 @@
+# Merge into the existing oauth2-proxy alpha configuration (v7.14+).
+# This is a fragment, not a replacement for the company's provider configuration.
+# Mount the SAME existing SSO_PROXY_SECRET key as this proxy-only file.
+# PreserveRequestValue=false strips client-supplied identity/proxy headers.
+# Route authenticated traffic through the proxy upstream to the ClusterIP service.
+# https://oauth2-proxy.github.io/oauth2-proxy/7.14.x/configuration/alpha-config/
+injectRequestHeaders:
+  - name: X-Auth-Request-Email
+    preserveRequestValue: false
+    values:
+      - claimSource:
+          claim: email
+  - name: X-Urchin-Proxy-Secret
+    preserveRequestValue: false
+    values:
+      - secretSource:
+          fromFile: /var/run/urchin-people/proxy-secret

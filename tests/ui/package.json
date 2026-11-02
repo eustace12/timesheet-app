@@ -1,0 +1,6 @@
+{
+  "name": "urchin-people-ui-tests",
+  "private": true,
+  "scripts": {"test": "node --test ../workspace-core.test.cjs workspace.test.cjs office.test.cjs"},
+  "devDependencies": {"jsdom": "30.1.3"}
+}

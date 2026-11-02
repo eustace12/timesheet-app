@@ -25,12 +25,13 @@ class PDFTimesheetGenerator:
     """Generate timesheet directly to PDF"""
     
     def __init__(self, year, month, employee_name, company_name="Urchin Systems SA", hours_per_day=8, 
-                 vacation_dates=None, sick_dates=None, custom_absences=None, holiday_scope="national"):
+                 vacation_dates=None, sick_dates=None, custom_absences=None, holiday_scope="national", daily_hours=None):
         self.year = year
         self.month = month
         self.employee_name = employee_name
         self.company_name = company_name
         self.hours_per_day = hours_per_day
+        self.daily_hours = daily_hours
         self.holiday_scope = "national"
         self.vacation_dates = vacation_dates or []  # List of date ranges
         self.sick_dates = sick_dates or []
@@ -78,8 +79,11 @@ class PDFTimesheetGenerator:
                 absence_type = None
                 absence_reason = None
             
-            # Count working days (excluding weekends, holidays, and absences)
-            if not is_weekend and not is_holiday and not absence_type:
+            logged_hours = (self.daily_hours.get(current_date_obj, 0) if self.daily_hours is not None
+                            else (self.hours_per_day if not is_weekend and not is_holiday else 0))
+            if absence_type:
+                logged_hours = 0
+            if logged_hours > 0:
                 working_days_count += 1
             
             all_days.append({
@@ -89,9 +93,10 @@ class PDFTimesheetGenerator:
                 'holiday_name': holiday_name,
                 'absence_type': absence_type,
                 'absence_reason': absence_reason,
+                'hours': logged_hours,
             })
         
-        total_hours = working_days_count * self.hours_per_day
+        total_hours = round(sum(day['hours'] for day in all_days), 6)
         return working_days_count, total_hours, all_days
     
     def generate(self, output_path):
@@ -183,6 +188,9 @@ class PDFTimesheetGenerator:
                 # Vacation, sick leave, or custom absence
                 regular_str = absence_reason
                 hours = 0
+            elif self.daily_hours is not None:
+                regular_str = str(round(day_info['hours'], 4))
+                hours = day_info['hours']
             elif is_holiday:
                 regular_str = holiday_name
                 hours = 0
@@ -397,6 +405,9 @@ class ExcelTimesheetGenerator(PDFTimesheetGenerator):
             if absence_type:
                 regular_val = day_info['absence_reason']
                 hours = 0
+            elif self.daily_hours is not None:
+                regular_val = round(day_info['hours'], 4)
+                hours = day_info['hours']
             elif is_holiday:
                 regular_val = day_info['holiday_name']
                 hours = 0

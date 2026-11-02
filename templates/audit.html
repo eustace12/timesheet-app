@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit trail · Urchin People</title><link rel="icon" href="/static/favicon.ico">
+<link rel="stylesheet" data-view-style href="/static/hr.css"><link rel="stylesheet" href="/static/people-shell.css">
+{% include 'brand_head.html' %}
+</head><body class="people-app" data-demo-role="{{ demo_role }}">
+{% include 'app_shell.html' %}
+{% from 'ui_components.html' import status_badge with context %}
+{% macro person_name(person_id, fallback) -%}
+{% set person = users_by_id.get(person_id) %}{{ (person.full_name|default(person)) if person else fallback }}
+{%- endmacro %}
+<main id="people-view" tabindex="-1" data-section="audit"><div class="workspace"><div class="workspace-content">
+<div class="page-heading"><div><p class="eyebrow">ACCOUNTING RECORDS</p><h1>Audit trail</h1><p class="subtle">Who submitted, reviewed or reopened a document, and when.</p></div></div>
+<section class="panel" aria-labelledby="audit-heading"><div class="panel-heading"><h2 id="audit-heading">Recent activity <span class="pill">{{ events|length }}</span></h2></div>
+<p class="subtle">Latest 100 recorded events, newest first. This journal is read-only. Earlier activity is not reconstructed.</p>
+{% if events %}<div class="table-scroll"><table><thead><tr><th>When (UTC)</th><th>Employee</th><th>Record</th><th>Action</th><th>Performed by</th><th>Comment</th></tr></thead><tbody>
+{% for event in events %}<tr>
+<td><time datetime="{{ event.created_at }}">{{ event.created_at|display_date }}<small class="subtle"> · {{ (event.created_at|string)[11:19] }} UTC</small></time></td>
+<td>{{ person_name(event.user_id, 'Employee #' + event.user_id|string) }}</td>
+<td>{% if event.kind == 'timesheets' %}Monthly timesheet #{{ event.document_id }}{% elif event.kind == 'leave_requests' %}Time-off request #{{ event.document_id }}{% elif event.kind == 'entitlement' %}Annual allowance · {{ event.document_id }}{% else %}{{ event.kind }} #{{ event.document_id }}{% endif %}</td>
+<td><strong>{{ {'submitted':'Submitted', 'resubmitted':'Resubmitted', 'reviewed':'Reviewed', 'reopened':'Reopened for changes', 'allowance_updated':'Allowance updated'}.get(event.action,event.action) }}</strong><br>{% if event.status == 'updated' %}<span class="status-badge status-draft">Updated</span>{% else %}{{ status_badge(event.status) }}{% endif %}</td>
+<td>{{ person_name(event.actor_user_id, 'Demo / legacy') }}</td>
+<td>{{ event.comment or '—' }}</td>
+</tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="empty-state"><h3>No recorded activity yet</h3><p>New submissions, review decisions, reopened months and allowance changes will appear here.</p></div>{% endif %}
+</section></div></div></main></body></html>

@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
@@ -18,8 +18,49 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.lock
           pip install -r requirements-dev.txt
+          pip install pip-audit
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.15.0'
+
+      - name: Install UI test dependencies
+        run: npm ci --prefix tests/ui
+
+      - name: Enable PostgreSQL integration checks
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/postgresql/16/bin:$PATH"
+          command -v initdb
+          command -v pg_ctl
+          command -v psql
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+
+      - name: Check source syntax and definite Python errors
+        run: |
+          set -euo pipefail
+          ruff check --select E9,F63,F7,F82 . --exclude static/vendor --exclude .agents --exclude tests/ui/node_modules
+          for script in static/*.js; do node --check "$script"; done
 
       - name: Run tests
         run: pytest -q
+
+      - name: Run UI regression checks
+        run: npm test --prefix tests/ui
+
+      - name: Audit release dependencies
+        run: |
+          pip-audit -r requirements.lock
+          npm audit --prefix tests/ui --audit-level=high
+
+      - name: Build company image
+        run: docker build --platform linux/amd64 -t urchin-people:release-check .
+
+      - name: Verify production refuses missing configuration
+        run: |
+          if docker run --rm urchin-people:release-check; then
+            echo 'Production started without required SSO and persistence configuration'
+            exit 1
+          fi

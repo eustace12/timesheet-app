@@ -1,6 +1,6 @@
 """PDF generator for leave / vacation requests."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -12,7 +12,11 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 
 def build_leave_filename(employee_name: str, start: date, end: date) -> str:
-    clean = employee_name.replace(" ", "_")
+    clean = "".join(
+        character if character.isalnum() else "_"
+        for character in employee_name.strip()
+    ).strip("_")
+    clean = clean or "employee"
     return f"Leave_{clean}_{start.isoformat()}_{end.isoformat()}.pdf"
 
 
@@ -28,7 +32,7 @@ def generate_leave_pdf(
     submitted_at: datetime | None = None,
 ) -> Path:
     output_path = Path(output_path)
-    submitted_at = submitted_at or datetime.utcnow()
+    submitted_at = submitted_at or datetime.now(timezone.utc)
     calendar_days = (end_date - start_date).days + 1
     if calendar_days < 1:
         raise ValueError("End date must be on or after start date")
@@ -67,7 +71,7 @@ def generate_leave_pdf(
 
     elements = []
     title_table = Table(
-        [[Paragraph("LEAVE REQUEST / CERERE DE CONCEDIU", title_style)]],
+        [[Paragraph("LEAVE REQUEST", title_style)]],
         colWidths=[174 * mm],
     )
     title_table.setStyle(

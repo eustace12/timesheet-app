@@ -44,12 +44,16 @@ REGIONAL_KEYWORDS = (
     "law enforcement",
 )
 
+class HolidayDataUnavailable(RuntimeError):
+    """No trustworthy calendar is available for an accounting calculation."""
+
+
 _raw_memory: dict[int, dict[date, str]] = {}
 _meta_memory: dict[int, dict] = {}
 
 
 def _cache_dir() -> Path:
-    if os.environ.get("VERCEL"):
+    if os.environ.get("VERCEL") or os.environ.get("APP_MODE") == "production":
         return Path("/tmp/holidays_cache")
     return Path(__file__).parent / ".cache" / "holidays"
 
@@ -85,19 +89,39 @@ def filter_holidays(holidays: dict[date, str], scope: HolidayScope = "national")
     return {d: n for d, n in holidays.items() if not _is_regional(n)}
 
 
+# Basic integrity checks for the Moldova feed used by this application. A
+# truncated response must not become an apparently valid annual calendar.
+_REQUIRED_FIXED_DATES = {(1, 1), (1, 7), (1, 8), (3, 8), (5, 1), (5, 9),
+                         (8, 27), (8, 31), (12, 25)}
+
+
+def _valid_calendar(holidays, year):
+    return bool(isinstance(holidays, dict) and holidays
+                and all(isinstance(day, date) and day.year == year
+                        and isinstance(name, str) and name.strip()
+                        for day, name in holidays.items())
+                and _REQUIRED_FIXED_DATES.issubset({(day.month, day.day) for day in holidays}))
+
+
 def _load_disk(year: int) -> dict[date, str] | None:
-    path = _cache_file(year)
-    if not path.is_file():
+    try:
+        raw = json.loads(_cache_file(year).read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or not raw:
+            return None
+        result = {date.fromisoformat(k): v for k, v in raw.items()}
+        if not _valid_calendar(result, year):
+            return None
+        return result
+    except (OSError, ValueError, TypeError):
         return None
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    return {date.fromisoformat(k): v for k, v in raw.items()}
 
 
 def _load_meta(year: int) -> dict:
-    path = _meta_file(year)
-    if not path.is_file():
+    try:
+        value = json.loads(_meta_file(year).read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _save_disk(year: int, holidays: dict[date, str], *, from_api: bool) -> None:
@@ -122,15 +146,26 @@ def _fetch_from_nager(year: int) -> dict[date, str]:
     with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
         items = json.loads(resp.read().decode("utf-8"))
 
+    if not isinstance(items, list) or not items:
+        raise ValueError("Empty or invalid public holiday response")
     holidays: dict[date, str] = {}
     for item in items:
-        types = item.get("types") or []
+        if not isinstance(item, dict) or not isinstance(item.get("types"), list):
+            raise ValueError("Invalid public holiday entry")
+        types = item["types"]
         if "Public" not in types:
             continue
         d = date.fromisoformat(item["date"])
-        name = (item.get("name") or item.get("localName") or "Public Holiday").strip()
+        if d.year != year:
+            raise ValueError("Holiday year does not match request")
+        name = item.get("name") or item.get("localName") or "Public Holiday"
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Invalid public holiday name")
+        name = name.strip()
         holidays[d] = name
 
+    if not holidays:
+        raise ValueError("No public holidays in response")
     for d, name in list(holidays.items()):
         lower = name.lower()
         if "easter" in lower and "monday" not in lower:
@@ -146,28 +181,31 @@ def _fetch_from_nager(year: int) -> dict[date, str]:
 
 
 def _load_raw(year: int) -> dict[date, str]:
-    if year in _raw_memory:
+    if _raw_memory.get(year):
         return _raw_memory[year]
-
-    holidays: dict[date, str]
     from_api = False
     try:
         holidays = _fetch_from_nager(year)
-        _save_disk(year, holidays, from_api=True)
+        if not _valid_calendar(holidays, year):
+            raise ValueError("Incomplete holiday calendar")
         from_api = True
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError, OSError):
-        cached = _load_disk(year)
-        holidays = cached if cached is not None else {}
-        if cached is not None:
-            _meta_memory[year] = _load_meta(year)
-
-    if year not in _meta_memory:
-        _meta_memory[year] = _load_meta(year) or {
-            "source": HOLIDAY_SOURCE,
-            "from_api": from_api,
-            "count": len(holidays),
-        }
-
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, KeyError, TypeError):
+        holidays = _load_disk(year)
+        if not _valid_calendar(holidays, year):
+            # Never memoize an empty failure: later requests must be able to recover.
+            _raw_memory.pop(year, None)
+            _meta_memory.pop(year, None)
+            raise HolidayDataUnavailable("The holiday calendar is temporarily unavailable.") from None
+        _meta_memory[year] = _load_meta(year)
+    else:
+        try:
+            _save_disk(year, holidays, from_api=True)
+        except OSError:
+            # A cache write failure does not invalidate a freshly verified response.
+            pass
+    if not _meta_memory.get(year):
+        _meta_memory[year] = {"source": HOLIDAY_SOURCE, "from_api": from_api,
+                              "count": len(holidays)}
     _raw_memory[year] = holidays
     return holidays
 

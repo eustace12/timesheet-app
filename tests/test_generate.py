@@ -38,15 +38,26 @@ def test_multi_period_absences_preview(client, form_base):
 
 
 def test_generate_rate_limit(client, form_base):
+    import db
     from web_app import app, reset_rate_limit_for_tests
 
     reset_rate_limit_for_tests()
     app.config['TESTING'] = False
     try:
+        user = db.get_user_by_username("employee")
+        with client.session_transaction() as session:
+            session["user_id"] = user["id"]
+            session["_csrf_token"] = "test-csrf-token"
         for _ in range(10):
-            r = client.post("/generate", data={**form_base, "format": "pdf"})
+            r = client.post(
+                "/generate",
+                data={**form_base, "format": "pdf", "_csrf_token": "test-csrf-token"},
+            )
             assert r.status_code == 200
-        r = client.post("/generate", data={**form_base, "format": "pdf"})
+        r = client.post(
+            "/generate",
+            data={**form_base, "format": "pdf", "_csrf_token": "test-csrf-token"},
+        )
         assert r.status_code == 429
     finally:
         app.config['TESTING'] = True

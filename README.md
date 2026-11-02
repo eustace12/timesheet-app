@@ -1,122 +1,56 @@
-# 📋 Timesheet Generator
+# Urchin People
 
-Professional monthly timesheet generator with Moldovan holidays support.
+Monthly timesheets, time off, accounting approvals and an immutable activity journal for Urchin Systems. This project is separate from the original database-free generator in the sibling `timesheet-app` checkout.
 
-## Features
+## Access profiles
 
-- ✅ **Automatic PDF generation** - direct to PDF, no Excel needed
-- ✅ **Moldovan holidays** - all 12 public holidays for 2025
-- ✅ **Vacation tracking** - select date ranges visually
-- ✅ **Sick leave** - track medical absences
-- ✅ **Visual calendar** - pick dates with beautiful UI
-- ✅ **Quick actions** - "1 Week", "2 Weeks" buttons
-- ✅ **Live statistics** - see working days & hours in real-time
-- ✅ **Professional design** - ready for HR submission
+- **Closed account mode (prepared locally):** `APP_MODE=production`, `AUTH_MODE=account`. Existing Supabase Auth email/password accounts must be explicitly linked by verified account UUID to a People profile. No app registration, demo impersonation or role switching. Server-side encrypted, revocable sessions; expired access requires signing in again. No existing accounts or passwords are created by this code.
+- **Corporate proxy mode (retained, rollout deferred):** `APP_MODE=production`, `AUTH_MODE=proxy` (the existing default). Verified proxy identity and database permissions; no demo impersonation. Real SSO/Kubernetes configuration is a separate future step.
+- **Public demo:** <https://urchin-people-demo.vercel.app/>. `APP_MODE=demo`, fictional data, shared access, Employee/Accountant perspectives. This address is not the company deployment and must not contain real employee records.
 
-## Quick Start
+## Core workflows
 
-### Run Locally
+- Prepare a month without daily time logging, add absences, preview the actual PDF, export PDF/Excel and submit to accounting.
+- Approved annual, unpaid and other leave are enforced on the server and retain their correct types. A submitted month's absence snapshot remains fixed.
+- Accounting approves or requests corrections. Submitted and approved documents are locked; approved timesheets require an explicit reopen with a reason.
+- Previous months awaiting corrections remain visible on Home. Returned leave can be prepared again directly from Time off.
+- Team balances identify missing allowances and reservations. Accountant edits name the affected employee explicitly.
+- Concurrent submissions, leave overlaps, balances and stale decisions are checked transactionally in SQLite and PostgreSQL. Decisions and authors are appended to a read-only journal.
+- Navigation and contextual drawers preserve drafts by person and month; layouts adapt to mobile screens.
 
-```bash
-# Install dependencies
-pip3 install -r requirements.txt
+## Optional office plans
 
-# Start server
-python3 web_app.py
+At `/office`, employees choose office days with one tap and optionally add arrival/departure times. The shared week shows who plans to come in. Plans require no approval and have no effect on timesheets or leave balances. Time drafts stay separate by employee and date; stale updates are detected. The original office spreadsheet is a reference only; its employee records are not imported.
 
-# Open browser
-http://localhost:8080
+## Run locally
+
+```sh
+python3 -m venv .venv
+.venv/bin/pip install --require-hashes -r requirements.lock
+.venv/bin/pip install -r requirements-dev.txt
+APP_MODE=demo DEMO_MODE=1 .venv/bin/python web_app.py
 ```
 
-### Generate via CLI
+Local development uses SQLite and generated files. Company deployments require persistent Supabase records and a private document bucket; startup refuses insecure configuration. Do not reuse the public demo database for real company data.
 
-```bash
-# Simple generation
-python3 generate_timesheet.py --year 2025 --month 11 --employee "Your Name"
+## Verify
 
-# With vacation
-python3 generate_timesheet.py --year 2025 --month 11 \
-  --employee "Your Name" \
-  --vacation "14-21"
-
-# With multiple absences
-python3 generate_timesheet.py --year 2025 --month 10 \
-  --employee "Your Name" \
-  --vacation "7-11" \
-  --sick "25-27" \
-  --absence 30 "Birthday"
+```sh
+python3 -m pytest -q
+npm exec --yes --package=node@24.15.0 -- npm ci --prefix tests/ui
+npm exec --yes --package=node@24.15.0 -- npm test --prefix tests/ui
+pip-audit -r requirements.lock
+npm audit --prefix tests/ui --audit-level=high
 ```
 
-## MVP demo (replace Zoho)
+Tests use recorded public holiday responses and disposable persistence, including during application import; inherited deployment database settings are not used. A missing/invalid runtime holiday source with no valid cache stops accounting calculations with a retryable error.
 
-Run `python3 web_app.py` and open http://localhost:8080.
+The PostgreSQL integration tests use temporary local databases when `initdb`, `pg_ctl` and `psql` are available. The Linux/amd64 base is digest-pinned and runtime requirements carry artifact hashes, enforced by pip --require-hashes. The company container build and release checks are in `.github/workflows/ci.yml`.
 
-- **Employee** submits a monthly timesheet and leave request.
-- **Admin** (accountant) downloads submissions from Inbox.
+See [DEPLOY.md](DEPLOY.md) and [deploy/README.md](deploy/README.md) for the migration order, company SSO contract, container, chart and rollback procedure. See the account activation plan in DEPLOY.md. This local stabilization has not enabled protection or changed the published demo; live activation, account audience/provisioning and remote Git writes require separate authorization.
 
-Demo logins:
+## Current scope
 
-| User | Password | Role |
-|------|----------|------|
-| `admin` | `admin123` | accountant inbox |
-| `employee` | `employee123` | employee |
-| `stanislav` | `employee123` | employee |
+The product covers a single company's monthly time and leave workflow. It does not include payroll calculation, automatic email notifications, leave cancellation, accrual/carry-over policy automation, or the rest of Zoho People. Define these policies before extending the workflow.
 
-SQLite lives at `data/timesheet.db` (local). Vercel `/tmp` is ephemeral — demo locally for the manager. Admin can add people at `/admin/users`.
-
-## Deploy to Vercel
-
-See [DEPLOY.md](DEPLOY.md) for detailed instructions.
-
-Quick deploy:
-```bash
-npm install -g vercel
-vercel
-```
-
-## Project Structure
-
-```
-timesheet-app/
-├── api/
-│   └── index.py          # Vercel serverless entry
-├── templates/
-│   └── index.html        # Web UI
-├── generated/            # Output PDFs (gitignored)
-├── generate_timesheet.py # Core PDF generator
-├── web_app.py           # Flask web interface
-├── requirements.txt     # Python dependencies
-├── vercel.json          # Vercel config
-└── README.md
-```
-
-## Moldovan Holidays 2025
-
-Automatically included:
-- New Year (Jan 1)
-- Orthodox Christmas (Jan 7-8)
-- Women's Day (Mar 8)
-- Orthodox Easter (Apr 20-21)
-- Labour Day (May 1)
-- Victory Day (May 9)
-- Independence Day (Aug 27)
-- Romanian Language Day (Aug 31)
-- **Chisinau City Day (Oct 14)**
-- Christmas (Dec 25)
-
-## License
-
-MIT
-
-
-
-
-
-
-
-
-
-
-
-
-
+MIT license.

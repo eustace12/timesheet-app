@@ -1,0 +1,21 @@
+# Required environment-owned values deliberately have no deployment defaults.
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+replicas: 2
+existingSecret: ""
+# Existing secret keys: SECRET_KEY, SSO_PROXY_SECRET, SUPABASE_URL,
+# SUPABASE_SERVICE_ROLE_KEY. Do not put their values in Helm files.
+storageBucket: timesheet-documents
+identityMapping: {}
+trustedProxy:
+  namespace: ""
+  podLabels: {}
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 768Mi

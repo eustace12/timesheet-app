@@ -1,163 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inbox · Urchin Systems</title>
-
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
-    <meta name="theme-color" content="#1E3A5F">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='mvp.css') }}">
-</head>
-<body>
-<div class="container wide">
-    <header class="header">
-        <div class="header-inner">
-            <div class="header-brand">
-                <img
-                    class="header-mark"
-                    src="{{ url_for('static', filename='favicon-32x32.png') }}"
-                    width="52"
-                    height="52"
-                    alt="Urchin Systems"
-                >
-                <div>
-                    <h1>Accountant inbox</h1>
-                    <p>Monthly timesheets and leave requests</p>
-                </div>
-            </div>
-            <img
-                class="header-wordmark"
-                src="{{ url_for('static', filename='logo.png') }}"
-                alt="Urchin Systems"
-            >
-        </div>
-    </header>
-
-    <nav class="app-nav">
-        <div class="app-nav-links">
-            <a href="/">Timesheet</a>
-            <a href="/leave">Leave request</a>
-            {% if user and user.role == 'admin' %}
-            <a href="/admin" class="active">Inbox</a>
-            <a href="/admin/users">People</a>
-            {% endif %}
-        </div>
-        <div class="app-nav-user">
-            {% if user %}
-            {{ user.full_name }} · <a href="/logout">Log out</a>
-            {% endif %}
-        </div>
-    </nav>
-
-    <div class="page-body">
-        <form method="get" action="/admin" class="section">
-            <div class="section-head">Period</div>
-            <div class="field-row triple">
-                <div class="field">
-                    <label for="year">Year</label>
-                    <input type="number" id="year" name="year" value="{{ year }}" min="2020" max="2030" required>
-                </div>
-                <div class="field">
-                    <label for="month">Month</label>
-                    <select id="month" name="month" required>
-                        {% for i in range(1, 13) %}
-                        <option value="{{ i }}" {% if i == month|int %}selected{% endif %}>
-                            {{ months[i-1] }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button type="submit" class="btn btn-primary">View month</button>
-            </div>
-        </form>
-
-        <section class="section">
-            <div class="section-head">Timesheets</div>
-            {% if timesheets %}
-            <div class="table-wrap">
-                <table class="data">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th>Period</th>
-                            <th>Hours</th>
-                            <th>Submitted</th>
-                            <th>Download</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in timesheets %}
-                        <tr>
-                            <td>{{ row.full_name }}</td>
-                            <td>{{ months[row.month - 1] }} {{ row.year }}</td>
-                            <td>{{ row.total_hours }}</td>
-                            <td>{{ row.submitted_at }}</td>
-                            <td><a href="/admin/timesheets/{{ row.id }}/download">Download</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="empty">No timesheets submitted for this month.</p>
-            {% endif %}
-        </section>
-
-        <section class="section">
-            <div class="section-head">Missing</div>
-            {% if missing %}
-            <ul class="missing-list">
-                {% for person in missing %}
-                <li>{{ person.full_name or person }}</li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p class="empty">Everyone submitted</p>
-            {% endif %}
-        </section>
-
-        <section class="section">
-            <div class="section-head">Leave requests</div>
-            {% if leave_requests %}
-            <div class="table-wrap">
-                <table class="data">
-                    <thead>
-                        <tr>
-                            <th>Employee</th>
-                            <th>Type</th>
-                            <th>From</th>
-                            <th>To</th>
-                            <th>Comment</th>
-                            <th>Submitted</th>
-                            <th>Download</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in leave_requests %}
-                        <tr>
-                            <td>{{ row.full_name }}</td>
-                            <td>{{ row.leave_type }}</td>
-                            <td>{{ row.start_date }}</td>
-                            <td>{{ row.end_date }}</td>
-                            <td>{{ row.comment or '—' }}</td>
-                            <td>{{ row.submitted_at }}</td>
-                            <td><a href="/admin/leave/{{ row.id }}/download">Download</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <p class="empty">No leave requests yet.</p>
-            {% endif %}
-        </section>
-    </div>
-</div>
-</body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Approvals · Urchin People</title><link rel="icon" href="/static/favicon.ico"><link rel="stylesheet" data-view-style href="/static/hr.css"><link rel="stylesheet" href="/static/people-shell.css">{% include 'brand_head.html' %}</head>
+<body class="people-app" data-demo-role="{{ demo_role }}">{% include 'app_shell.html' %}{% from 'ui_components.html' import status_badge, review_form with context %}
+<main id="people-view" tabindex="-1" data-section="approvals" data-default-record-filter="submitted"><div class="workspace"><div class="workspace-content inbox-content">
+{% set all_records = (timesheets|list) + (leave_requests|list) %}{% set pending = all_records|selectattr('status','equalto','submitted')|list|length %}
+<div class="page-heading"><div><p class="eyebrow">TEAM WORKSPACE</p><h1>Approvals <span class="heading-count">{{ pending }}</span></h1><p class="subtle">Start with requests waiting on you. Open a request to review the details.</p></div><a class="button" href="/admin/export?year={{ year }}&amp;month={{ month }}">Export month</a></div>
+<div class="inbox-summary"><span><i class="summary-dot pending"></i><strong>{{ pending }}</strong> awaiting review</span><span><i class="summary-dot approved"></i><strong>{{ all_records|selectattr('status','equalto','accepted')|list|length }}</strong> approved</span><span><i class="summary-dot returned"></i><strong>{{ all_records|selectattr('status','equalto','needs_changes')|list|length }}</strong> returned for changes</span><span><strong>{{ missing|length }}</strong> missing timesheets</span></div>
+<section class="panel inbox-panel record-section"><div class="inbox-toolbar"><form method="get" action="/admin" class="period-filter accounting-filter"><label class="sr-only" for="review-year">Year</label><input id="review-year" name="year" type="number" value="{{ year }}" min="2020" max="2099" required aria-label="Year"><label class="sr-only" for="review-month">Month</label><select id="review-month" name="month" aria-label="Month">{% for number in range(1,13) %}<option value="{{ number }}" {% if number == month %}selected{% endif %}>{{ months[number-1] }}</option>{% endfor %}</select><button type="submit" class="button">View period</button></form><label class="request-search"><span class="sr-only">Search requests</span><input type="search" data-record-search placeholder="Search employee or request…" aria-label="Search requests"></label></div>
+<div class="record-filter" role="group" aria-label="Filter requests"><button type="button" data-record-filter="submitted" aria-pressed="true">Awaiting review <span>{{ pending }}</span></button><button type="button" data-record-filter="accepted" aria-pressed="false">Approved</button><button type="button" data-record-filter="needs_changes" aria-pressed="false">Changes requested</button><button type="button" data-record-filter="all" aria-pressed="false">All <span>{{ all_records|length }}</span></button></div>
+<div class="queue-head" aria-hidden="true"><span>Employee / request</span><span>Period</span><span>Details</span><span>Status</span><span></span></div><div class="approval-queue">
+{% for kind, records in [('timesheets',timesheets),('leave',leave_requests)] %}{% for row in records %}
+<button type="button" class="approval-row" data-open-review="review-{{ kind }}-{{ row.id }}" data-record-status="{{ row.status }}" data-search-text="{{ row.full_name }} {{ 'Monthly timesheet' if kind == 'timesheets' else 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}" aria-haspopup="dialog"><span class="queue-person"><span class="record-avatar" aria-hidden="true">{{ row.full_name[:1] }}</span><span><strong>{{ row.full_name }}</strong><small>{{ 'Monthly timesheet' if kind == 'timesheets' else 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}</small></span></span><span class="queue-period">{% if kind == 'timesheets' %}{{ months[row.month-1] }} {{ row.year }}{% else %}{{ row.start_date|display_date }}<small>to {{ row.end_date|display_date }}</small>{% endif %}</span><span class="queue-detail">{% if kind == 'timesheets' %}<strong>{{ '%g'|format(row.total_hours) }} h</strong><small>{{ row.format|upper }}</small>{% else %}Time off<small>Submitted {{ row.submitted_at|display_date }}</small>{% endif %}</span>{{ status_badge(row.status) }}<span class="queue-arrow" aria-hidden="true">›</span></button>
+{% endfor %}{% endfor %}</div><div class="empty-filter quiet-empty" hidden><span aria-hidden="true">✓</span><h3>No matching requests</h3><p>Try another status, employee or month.</p></div>{% if not all_records %}<div class="quiet-empty"><h3>No requests for this month</h3><p>Submitted timesheets and time off will appear here.</p></div>{% endif %}</section>
+<details class="panel missing-panel"><summary>Missing timesheets <span class="pill">{{ missing|length }}</span><span class="subtle">{{ months[month-1] }} {{ year }}</span></summary>{% if missing %}<p class="subtle">These employees haven't submitted a timesheet for this period.</p><div class="missing-people">{% for row in missing %}<span><span class="record-avatar" aria-hidden="true">{{ row.full_name[:1] }}</span>{{ row.full_name }}</span>{% endfor %}</div>{% else %}<p class="subtle">Everyone has submitted a timesheet for this period.</p>{% endif %}</details>
+<div class="review-store" hidden>{% for kind, records in [('timesheets',timesheets),('leave',leave_requests)] %}{% for row in records %}<article id="review-{{ kind }}-{{ row.id }}" class="request-detail"><div class="review-identity"><span class="record-avatar" aria-hidden="true">{{ row.full_name[:1] }}</span><div><h3>{{ row.full_name }}</h3><p>{{ 'Monthly timesheet' if kind == 'timesheets' else 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}</p></div>{{ status_badge(row.status) }}</div><dl class="review-facts">{% if kind == 'timesheets' %}<div><dt>Period</dt><dd>{{ months[row.month-1] }} {{ row.year }}</dd></div><div><dt>Total hours</dt><dd>{{ '%g'|format(row.total_hours) }} hours</dd></div><div><dt>Format</dt><dd>{{ row.format|upper }}</dd></div>{% else %}<div><dt>From</dt><dd>{{ row.start_date|display_date }}</dd></div><div><dt>To</dt><dd>{{ row.end_date|display_date }}</dd></div>{% endif %}<div><dt>Submitted</dt><dd>{{ row.submitted_at|display_date }}</dd></div></dl>
+{% if kind == 'leave' %}{% if row.comment %}<div class="request-note"><h4>Employee note</h4><p>{{ row.comment }}</p></div>{% endif %}<section class="review-context" data-assessment-url="/leave/assessment?user_id={{ row.user_id }}&amp;start_date={{ row.start_date }}&amp;end_date={{ row.end_date }}&amp;leave_type={{ row.leave_type|urlencode }}{% if row.status in ['accepted','submitted'] %}&amp;request_id={{ row.id }}{% endif %}" aria-live="polite"><p class="subtle">Loading balance and team availability…</p></section>{% endif %}
+{% if row.review_comment %}<div class="request-note"><h4>Previous decision</h4><p>{{ row.review_comment }}</p></div>{% endif %}<div class="record-links">{% if kind == 'leave' or row.format == 'pdf' %}<a class="button" href="/admin/{{ kind }}/{{ row.id }}/view" data-document-preview data-document-title="{{ row.full_name }} · {{ 'Timesheet' if kind == 'timesheets' else 'Time off' }}">Preview {{ 'PDF' if kind == 'leave' else 'document' }}</a>{% endif %}<a href="/admin/{{ kind }}/{{ row.id }}/download">Download {{ row.format|upper if kind == 'timesheets' else 'PDF' }}</a></div>{{ review_form(kind,row,year,month) }}</article>{% endfor %}{% endfor %}</div>
+<dialog class="review-drawer" id="review-drawer" aria-labelledby="review-drawer-title"><header><div><p class="eyebrow">REQUEST DETAILS</p><h2 id="review-drawer-title">Review request</h2></div><button type="button" class="drawer-close" data-close-review aria-label="Close request details">×</button></header><div class="review-drawer-body"></div></dialog>
+</div></div></main></body></html>

@@ -1,0 +1,17 @@
+{% if is_production %}
+<div class="profile-selector company-identity" data-person="{{ user.id if user else 'none' }}" data-person-name="{{ user.full_name if user else '' }}"><span>{{ user.full_name if user else 'Company account' }}<small>{{ 'Accountant' if is_accountant else 'Employee' }}</small></span></div>
+{% else %}
+<form method="post" action="/profile" class="profile-selector">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <label for="selected_person">Employee</label>
+    <select id="selected_person" name="user_id" {% if not people %}disabled{% endif %}>
+        {% if not people %}<option value="">No employees yet</option>{% endif %}
+        {% for person in people %}
+        <option value="{{ person.id }}" {% if user and person.id == user.id %}selected{% endif %}>{{ person.full_name }}</option>
+        {% endfor %}
+    </select>
+    <noscript><button type="submit">Select</button></noscript>
+</form>
+
+{% endif %}

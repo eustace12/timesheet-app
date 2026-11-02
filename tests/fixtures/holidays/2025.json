@@ -1,0 +1,210 @@
+[
+  {
+    "date": "2025-01-01",
+    "localName": "New Year's Day",
+    "name": "New Year's Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-01-07",
+    "localName": "Craciun pe stil Vechi (Orthodox Christmas)",
+    "name": "Christmas Day (Orthodox)",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-01-08",
+    "localName": "Craciun pe stil Vechi (Orthodox Christmas)",
+    "name": "Christmas Day (Orthodox)",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-02-23",
+    "localName": "Day of Veterans of the Armed Forces and Law Enforcement Agencies",
+    "name": "Day of Veterans of the Armed Forces and Law Enforcement Agencies",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-03-08",
+    "localName": "International Women's Day",
+    "name": "International Women's Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-04-20",
+    "localName": "Orthodox Easter",
+    "name": "Easter Sunday",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-05-01",
+    "localName": "Labour Day (Moldova)",
+    "name": "Labour Day (Moldova)",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-05-09",
+    "localName": "Victory and Commemoration Day",
+    "name": "Victory and Commemoration Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-05-22",
+    "localName": "Bălţi Day",
+    "name": "Bălţi Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-08-25",
+    "localName": "Memorial Day",
+    "name": "Memorial Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-08-27",
+    "localName": "Independence Day",
+    "name": "Independence Day (Moldova)",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-08-31",
+    "localName": "Limba Noastra",
+    "name": "Limba Noastra (National Language Day)",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-09-03",
+    "localName": "Day of the Moldovan National Army",
+    "name": "Day of the Moldovan National Army",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-10-14",
+    "localName": "Capital's Day",
+    "name": "Capital's Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-11-21",
+    "localName": "South Capital's Day Cahul",
+    "name": "South Capital's Day Cahul",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  },
+  {
+    "date": "2025-12-25",
+    "localName": "Craciun pe stil Nou (Western Christmas)",
+    "name": "Christmas Day",
+    "countryCode": "MD",
+    "fixed": false,
+    "global": true,
+    "counties": null,
+    "launchYear": null,
+    "types": [
+      "Public"
+    ]
+  }
+]

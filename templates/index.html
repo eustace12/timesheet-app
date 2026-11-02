@@ -1,22 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ language }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Timesheet Generator · Urchin Systems</title>
+    <title>Monthly timesheet · Urchin People</title>
 
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
-    <meta name="theme-color" content="#1E3A5F">
+    <meta name="theme-color" content="#0c71c3">
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-    <style>
+    <style data-view-style>
         :root {
             --bg:            #F4F6F9;
             --surface:       #FFFFFF;
@@ -53,7 +49,7 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: var(--bg);
             min-height: 100vh;
             padding: 32px 16px 56px;
@@ -178,6 +174,7 @@
             opacity: .88;
             filter: brightness(0) invert(1);
             flex-shrink: 0;
+            display: none;
         }
 
         .app-nav {
@@ -202,6 +199,21 @@
         .app-nav a.active { color: var(--accent); background: white; }
         .app-nav-user { color: var(--text-muted); font-weight: 500; white-space: nowrap; }
         .app-nav-user a { color: var(--accent); }
+        .app-nav-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.profile-selector { display: flex; align-items: center; gap: 8px; margin: 0; max-width: 100%; }
+.profile-selector label { font-size: 12px; color: var(--text-muted); }
+.profile-selector select { min-width: 0; max-width: 220px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: white; color: var(--primary); font: inherit; }
+        .language-switcher { display: none; }
+        .language-switcher select {
+            padding: 5px 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: white;
+            color: var(--text-muted);
+            font: inherit;
+            font-size: 12px;
+            cursor: pointer;
+        }
 
         /* ── FORM ── */
         .form-wrap { padding: 36px 40px; }
@@ -806,7 +818,7 @@
             border-radius: 12px !important;
             z-index: 9999 !important;
             border: 1px solid var(--border) !important;
-            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
+            font-family: 'Open Sans', -apple-system, sans-serif !important;
             overflow: hidden !important;
             width: 310px !important;
             position: fixed !important;
@@ -1031,6 +1043,8 @@
             .header-mark { width: 44px; height: 44px; border-radius: 12px; }
             .form-wrap { padding: 22px 20px; }
             .app-nav { padding: 10px 16px; }
+            .app-nav { flex-wrap: wrap; }
+            .app-nav-actions { gap: 8px; }
 
             .field-row       { grid-template-columns: 1fr; gap: 12px; }
             .stats-grid      { grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -1050,62 +1064,32 @@
             .qbtn { padding: 6px 11px; font-size: 11px; }
         }
     </style>
+    <link rel="stylesheet" href="/static/people-shell.css">
+{% include 'brand_head.html' %}
 </head>
-<body>
+<body class="people-app" data-demo-role="{{ demo_role }}">
+{% include "app_shell.html" %}
+<main id="people-view" data-view="timesheet" data-period-explicit="{{ 'true' if request.args.get('month') or request.args.get('year') else 'false' }}" tabindex="-1">
 <div class="container">
 
-    <header class="header">
-        <div class="header-inner">
-            <div class="header-brand">
-                <img
-                    class="header-mark"
-                    src="{{ url_for('static', filename='favicon-32x32.png') }}"
-                    width="52"
-                    height="52"
-                    alt="Urchin Systems"
-                >
-                <div class="header-copy">
-                    <div class="header-tag">Republic of Moldova</div>
-                    <h1>Timesheet Generator</h1>
-                    <p>Monthly work hours · Moldovan public holidays</p>
-                </div>
-            </div>
-            <img
-                class="header-wordmark"
-                src="{{ url_for('static', filename='logo.png') }}"
-                alt="Urchin Systems"
-            >
-        </div>
-    </header>
+    <header class="header"><div class="header-copy"><h1>Monthly timesheet</h1><p>Review your work schedule, add absences and submit your month.</p></div></header>
 
-    <nav class="app-nav">
-        <div class="app-nav-links">
-            <a href="/" class="active">Timesheet</a>
-            <a href="/leave">Leave request</a>
-            {% if user and user.role == 'admin' %}
-            <a href="/admin">Inbox</a>
-            <a href="/admin/users">People</a>
-            {% endif %}
-        </div>
-        <div class="app-nav-user">
-            {% if user %}
-            {{ user.full_name }} · <a href="/logout">Log out</a>
-            {% endif %}
-        </div>
-    </nav>
 
+    <div id="period-status" class="period-status" role="status" hidden></div>
     <div class="form-wrap">
         <form id="timesheetForm">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
+            <div class="timesheet-layout"><section class="timesheet-details">
             <!-- Period -->
-            <div class="section-head">Period</div>
+            <div class="section-head">{{ t('common.period') }}</div>
             <div class="field-row">
                 <div class="field">
-                    <label for="year">Year</label>
-                    <input type="number" id="year" name="year" value="{{ current_year }}" min="2020" max="2030" required>
+                    <label for="year">{{ t('common.year') }}</label>
+                    <input type="number" id="year" name="year" value="{{ current_year }}" min="2020" max="2099" required>
                 </div>
                 <div class="field">
-                    <label for="month">Month</label>
+                    <label for="month">{{ t('common.month') }}</label>
                     <select id="month" name="month" required>
                         {% for i in range(1, 13) %}
                         <option value="{{ i }}" {% if i == current_month %}selected{% endif %}>
@@ -1117,11 +1101,11 @@
             </div>
 
             <!-- Employee -->
-            <div class="section-head" style="margin-top:20px;">Employee</div>
-            <div class="field-row single">
+            <div class="section-head employee-details-heading" style="margin-top:24px;">Employee details</div>
+            <div class="field-row single employee-details-field">
                 <div class="field">
-                    <label for="employee_name">Full Name</label>
-                    <input type="text" id="employee_name" name="employee_name" value="{{ user.full_name if user else 'Iuntevici Stanislav' }}" placeholder="Employee name" required readonly>
+                    <label for="employee_name">{{ t('common.full_name') }}</label>
+                    <input type="text" id="employee_name" name="employee_name" value="{{ user.full_name if user else '' }}" placeholder="{{ t('common.employee') }}" required {% if user %}readonly{% endif %}>
                 </div>
             </div>
 
@@ -1130,10 +1114,57 @@
 
             <div class="hr"></div>
 
+            <!-- Stats -->
+            <div class="stats-section" id="statsBox" style="display:none;">
+                <div class="hr" style="margin-bottom:18px;"></div>
+                <div class="section-head">{{ t('timesheet.monthly_summary') }}</div>
+
+                <div class="stats-grid">
+                    <div class="stat-card c-total">
+                        <div class="stat-accent neutral"></div>
+                        <div class="stat-val" id="statTotalDays">—</div>
+                        <div class="stat-lbl">{{ t('timesheet.days_in_month') }}</div>
+                    </div>
+                    <div class="stat-card c-work">
+                        <div class="stat-accent work"></div>
+                        <div class="stat-val" id="statWorkingDays">—</div>
+                        <div class="stat-lbl">{{ t('timesheet.working_days') }}</div>
+                    </div>
+                    <div class="stat-card c-holiday">
+                        <div class="stat-accent holiday"></div>
+                        <div class="stat-val" id="statHolidays">—</div>
+                        <div class="stat-lbl">{{ t('timesheet.holidays') }}</div>
+                    </div>
+                    <div class="stat-card c-hours">
+                        <div class="stat-accent hours"></div>
+                        <div class="stat-val" id="statExpectedHours">—</div>
+                        <div class="stat-lbl">{{ t('timesheet.total_hours') }}</div>
+                    </div>
+                </div>
+
+                <div class="absence-chips" id="absenceChips" style="display:none;">
+                    <div class="chip vacation">
+                        <span class="chip-label"><span class="type-dot vacation"></span> {{ t('timesheet.vacation') }}</span>
+                        <strong id="statVacation">—</strong>
+                    </div>
+                    <div class="chip sick">
+                        <span class="chip-label"><span class="type-dot sick"></span> {{ t('timesheet.sick') }}</span>
+                        <strong id="statSick">—</strong>
+                    </div>
+                    <div class="chip custom">
+                        <span class="chip-label"><span class="type-dot custom"></span> {{ t('timesheet.other') }}</span>
+                        <strong id="statCustom">—</strong>
+                    </div>
+                </div>
+            </div>
+
+            </section><section class="timesheet-absences">
+            <section class="month-overview" aria-labelledby="month-overview-title"><div class="panel-heading"><h2 id="month-overview-title">Your month</h2><span class="subtle" data-month-overview-period></span></div><div id="monthOverview" class="month-grid" role="list" aria-label="Monthly work schedule"></div><div class="month-legend"><span><i class="work"></i>Work</span><span><i class="leave"></i>Leave</span><span><i class="sick"></i>Sick</span><span><i class="holiday"></i>Holiday</span><span><i class="weekend"></i>Weekend</span></div></section>
+            <details class="absence-editor"><summary>Add or update absences <span>Optional</span></summary><p class="absence-guidance">Dates entered here affect this timesheet. Use <button type="button" class="text-button" data-request-leave>Request leave</button> to manage approval and your leave balance. Approved leave dates are included automatically.</p>
             <!-- Absences -->
             <div class="section-head">
-                Absences
-                <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-light);font-size:11px;margin-left:4px;">— optional</span>
+                {{ t('timesheet.absences') }}
+                <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-light);font-size:11px;margin-left:4px;">— {{ t('common.optional') }}</span>
             </div>
 
             <div class="absence-stack">
@@ -1142,17 +1173,20 @@
                 <div class="absence-card vacation">
                     <div class="absence-head">
                         <div class="absence-label">
-                            <span class="type-dot vacation"></span> Vacation
+                            <span class="type-dot vacation"></span> {{ t('timesheet.vacation') }}
                         </div>
-                        <button type="button" class="btn-clear" onclick="clearVacation()" aria-label="Clear vacation periods">Clear</button>
+                        <button type="button" class="btn-clear" onclick="clearVacation()" aria-label="{{ t('timesheet.clear_vacation') }}">{{ t('common.clear') }}</button>
                     </div>
                     <div class="absence-body">
-                        <input type="hidden" id="vacation" name="vacation">
+                        <input type="hidden" id="vacation" name="vacation" value="{{ approved_vacation }}" data-value="{{ approved_vacation }}">
+                        {% if approved_vacation %}
+                        <p class="hint info" style="display:block; margin:0 0 10px;">{{ t('timesheet.approved_leave_prefilled') }}</p>
+                        {% endif %}
                         <div class="quick-actions">
-                            <button type="button" class="qbtn" onclick="addQuickVacation(5)">+ 1 Week</button>
-                            <button type="button" class="qbtn" onclick="addQuickVacation(10)">+ 2 Weeks</button>
-                            <button type="button" class="qbtn" onclick="addQuickVacation(15)">+ 3 Weeks</button>
-                            <button type="button" class="qbtn pick" onclick="openCalendar('vacation')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Add Period</button>
+                            <button type="button" class="qbtn" onclick="addQuickVacation(5)">+ {{ t('timesheet.one_week') }}</button>
+                            <button type="button" class="qbtn" onclick="addQuickVacation(10)">+ {{ t('timesheet.two_weeks') }}</button>
+                            <button type="button" class="qbtn" onclick="addQuickVacation(15)">+ {{ t('timesheet.three_weeks') }}</button>
+                            <button type="button" class="qbtn pick" onclick="openCalendar('vacation')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {{ t('timesheet.add_period') }}</button>
                         </div>
                         <div class="selected-dates" id="vacationDisplay"></div>
                     </div>
@@ -1162,14 +1196,14 @@
                 <div class="absence-card sick">
                     <div class="absence-head">
                         <div class="absence-label">
-                            <span class="type-dot sick"></span> Sick Leave
+                            <span class="type-dot sick"></span> {{ t('timesheet.sick') }}
                         </div>
-                        <button type="button" class="btn-clear" onclick="clearSick()">Clear</button>
+                        <button type="button" class="btn-clear" onclick="clearSick()">{{ t('common.clear') }}</button>
                     </div>
                     <div class="absence-body">
                         <input type="hidden" id="sick" name="sick">
                         <div class="quick-actions">
-                            <button type="button" class="qbtn pick" onclick="openCalendar('sick')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Add Period</button>
+                            <button type="button" class="qbtn pick" onclick="openCalendar('sick')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {{ t('timesheet.add_period') }}</button>
                         </div>
                         <div class="selected-dates" id="sickDisplay"></div>
                     </div>
@@ -1179,20 +1213,20 @@
                 <div class="absence-card custom">
                     <div class="absence-head">
                         <div class="absence-label">
-                            <span class="type-dot custom"></span> Other Days
+                            <span class="type-dot custom"></span> {{ t('timesheet.other') }}
                         </div>
-                        <button type="button" class="btn-clear" onclick="clearCustom()">Clear</button>
+                        <button type="button" class="btn-clear" onclick="clearCustom()">{{ t('common.clear') }}</button>
                     </div>
                     <div class="absence-body">
                         <input type="text" id="custom_days" name="custom_days" style="display:none;">
                         <div class="quick-actions">
-                            <button type="button" class="qbtn pick" onclick="openCalendar('custom')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Pick Dates</button>
+                            <button type="button" class="qbtn pick" onclick="openCalendar('custom')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {{ t('timesheet.pick_dates') }}</button>
                         </div>
                         <div class="selected-dates" id="customDisplay"></div>
                         <div class="reason-block">
                             <div class="field">
-                                <label for="custom_reason">Reason</label>
-                                <input type="text" id="custom_reason" name="custom_reason" placeholder="e.g. Personal Day">
+                                <label for="custom_reason">{{ t('timesheet.reason') }}</label>
+                                <input type="text" id="custom_reason" name="custom_reason" placeholder="{{ t('timesheet.reason_placeholder') }}">
                             </div>
                         </div>
                     </div>
@@ -1200,55 +1234,13 @@
 
             </div><!-- /absence-stack -->
 
+            </details>
             <div class="hint" id="validationHint"></div>
 
-            <!-- Stats -->
-            <div class="stats-section" id="statsBox" style="display:none;">
-                <div class="hr" style="margin-bottom:18px;"></div>
-                <div class="section-head">Monthly Summary</div>
-
-                <div class="stats-grid">
-                    <div class="stat-card c-total">
-                        <div class="stat-accent neutral"></div>
-                        <div class="stat-val" id="statTotalDays">—</div>
-                        <div class="stat-lbl">Days in month</div>
-                    </div>
-                    <div class="stat-card c-work">
-                        <div class="stat-accent work"></div>
-                        <div class="stat-val" id="statWorkingDays">—</div>
-                        <div class="stat-lbl">Working days</div>
-                    </div>
-                    <div class="stat-card c-holiday">
-                        <div class="stat-accent holiday"></div>
-                        <div class="stat-val" id="statHolidays">—</div>
-                        <div class="stat-lbl">Holidays</div>
-                    </div>
-                    <div class="stat-card c-hours">
-                        <div class="stat-accent hours"></div>
-                        <div class="stat-val" id="statExpectedHours">—</div>
-                        <div class="stat-lbl">Total hours</div>
-                    </div>
-                </div>
-
-                <div class="absence-chips" id="absenceChips" style="display:none;">
-                    <div class="chip vacation">
-                        <span class="chip-label"><span class="type-dot vacation"></span> Vacation</span>
-                        <strong id="statVacation">—</strong>
-                    </div>
-                    <div class="chip sick">
-                        <span class="chip-label"><span class="type-dot sick"></span> Sick</span>
-                        <strong id="statSick">—</strong>
-                    </div>
-                    <div class="chip custom">
-                        <span class="chip-label"><span class="type-dot custom"></span> Other</span>
-                        <strong id="statCustom">—</strong>
-                    </div>
-                </div>
-            </div>
-
+            </section></div>
             <!-- Action buttons -->
             <div class="format-row">
-                <span class="format-label">Format</span>
+                <span class="format-label">{{ t('timesheet.format') }}</span>
                 <div class="format-options">
                     <label class="format-opt">
                         <input type="radio" name="format" value="pdf" checked onchange="updateGenerateLabel()">
@@ -1264,27 +1256,14 @@
             </div>
 
             <div class="btn-row">
-                <button type="button" class="btn-preview" id="previewBtn" onclick="showPreview()" aria-label="Preview timesheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                <button type="submit" class="btn-preview" id="generateBtn" aria-label="Download timesheet file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span id="generateBtnLabel">Download copy</span></button>
-                <button type="button" class="btn-generate" id="submitBtn" aria-label="Submit timesheet to accountant">Submit to accountant</button>
-            </div>
-
-            <!-- Preview section -->
-            <div class="preview-section" id="previewSection" style="display:none;">
-                <div class="hr" style="margin-bottom:18px;"></div>
-                <div class="preview-section-head">
-                    <div class="section-head" style="margin-bottom:0;">
-                        Timesheet Preview
-                        <span id="previewMonthLabel" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-light);font-size:11px;margin-left:4px;"></span>
-                    </div>
-                    <button type="button" class="btn-close-preview" onclick="closePreview()">Close</button>
-                </div>
-                <div id="previewContent"></div>
+                <button type="button" class="btn-preview" id="previewBtn" onclick="showPreview()" aria-label="Preview PDF"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Preview PDF</button>
+                <button type="submit" class="btn-preview" id="generateBtn" aria-label="{{ t('timesheet.download_copy') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2 2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span id="generateBtnLabel">{{ t('timesheet.download_copy') }}</span></button>
+                <button type="button" class="btn-generate" id="submitBtn" aria-label="{{ t('timesheet.submit_to_accountant') }}">{{ t('timesheet.submit_to_accountant') }}</button>
             </div>
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                <p id="loadingText">Generating…</p>
+                <p id="loadingText">{{ t('timesheet.generating') }}</p>
             </div>
 
             <div class="result" id="result"></div>
@@ -1301,978 +1280,54 @@
 <input type="text" id="vacationPickerInput" style="display:none;" readonly>
 <input type="text" id="sickPickerInput" style="display:none;" readonly>
 
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script>
-/* ── State ── */
-let pickers          = null;
-let holidaysCache    = {};
-const STORAGE_KEY    = 'timesheetFormV1';
-let activeCalType    = null;  // 'vacation' | 'sick' | 'custom'
-let suppressCalClose = false; // skip onCalClose during programmatic clear()
-let vacationPeriods  = [];    // [{start: Number, end: Number}]
-let sickPeriods      = [];
-let previewDays      = null;  // editable copy of /preview days[]
 
-const PREVIEW_STATUS_MAP = {
-    working:  { label: 'Working',    cls: 'row-working'  },
-    weekend:  { label: 'Weekend',    cls: 'row-weekend'  },
-    holiday:  { label: null,         cls: 'row-holiday'  },
-    vacation: { label: 'Vacation',   cls: 'row-vacation' },
-    sick:     { label: 'Sick Leave', cls: 'row-sick'     },
-    custom:   { label: null,         cls: 'row-custom'   },
-};
-const PREVIEW_EDIT_CYCLE = ['working', 'vacation', 'sick', 'custom'];
-
-const SVG = {
-    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
-    eye:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
-    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
-};
-const PREVIEW_BTN_HTML = `${SVG.eye} Preview`;
-
-function getSelectedFormat() {
-    const checked = document.querySelector('input[name="format"]:checked');
-    return checked ? checked.value : 'pdf';
-}
-
-function updateGenerateLabel() {
-    document.getElementById('generateBtnLabel').textContent = 'Download copy';
-}
-
-function isDownloadResponse(ct) {
-    return ct.includes('application/pdf')
-        || ct.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-}
-
-/* ── Helpers ── */
-function getYM() {
-    return {
-        year:  parseInt(document.getElementById('year').value),
-        month: parseInt(document.getElementById('month').value),
-    };
-}
-
-function holidayCacheKey(year) {
-    return String(year);
-}
-
-function getHolidayList(year) {
-    return holidaysCache[holidayCacheKey(year)] || [];
-}
-
-async function loadHolidays(year, force = false) {
-    const key = holidayCacheKey(year);
-    if (!force && holidaysCache[key] !== undefined) return holidaysCache[key];
-    try {
-        const r = await fetch(`/holidays/${year}`);
-        const d = await r.json();
-        const list = Array.isArray(d) ? d : (d.holidays || []);
-        holidaysCache[key] = list;
-        return list;
-    } catch (e) {
-        console.error('Holidays fetch failed:', e);
-        holidaysCache[key] = [];
-        return [];
-    }
-}
-
-function periodsFromString(str) {
-    if (!str) return [];
-    return str.split(',').map(part => {
-        const t = part.trim();
-        if (!t) return null;
-        if (t.includes('-')) {
-            const [a, b] = t.split('-').map(Number);
-            return { start: a, end: b };
-        }
-        const n = parseInt(t, 10);
-        return { start: n, end: n };
-    }).filter(Boolean);
-}
-
-function loadFormState() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const s = JSON.parse(raw);
-        if (s.year) document.getElementById('year').value = s.year;
-        if (s.month) document.getElementById('month').value = s.month;
-        if (s.employee_name && !document.getElementById('employee_name').readOnly) {
-            document.getElementById('employee_name').value = s.employee_name;
-        }
-        if (s.custom_reason) document.getElementById('custom_reason').value = s.custom_reason;
-        if (s.format) {
-            const radio = document.querySelector(`input[name="format"][value="${s.format}"]`);
-            if (radio) radio.checked = true;
-            updateGenerateLabel();
-        }
-        vacationPeriods = periodsFromString(s.vacation || '');
-        sickPeriods = periodsFromString(s.sick || '');
-        syncPeriodInput('vacation');
-        syncPeriodInput('sick');
-        renderPeriodBadges('vacation');
-        renderPeriodBadges('sick');
-        if (s.custom_days) setDateInput('custom_days', s.custom_days);
-    } catch (e) {
-        console.warn('Could not restore form state', e);
-    }
-}
-
-function saveFormState() {
-    try {
-        const state = {
-            year: document.getElementById('year').value,
-            month: document.getElementById('month').value,
-            employee_name: document.getElementById('employee_name').value,
-            custom_reason: document.getElementById('custom_reason').value,
-            format: getSelectedFormat(),
-            vacation: document.getElementById('vacation').getAttribute('data-value') || '',
-            sick: document.getElementById('sick').getAttribute('data-value') || '',
-            custom_days: document.getElementById('custom_days').getAttribute('data-value') || '',
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-        console.warn('Could not save form state', e);
-    }
-}
-
-function getHolidayName(day, month, year) {
-    const list = getHolidayList(year);
-    const h = list.find(h => h.month === month && h.day === day);
-    return h ? h.name : null;
-}
-
-/* ── Calendar backdrop ── */
-function openPeriodPicker(fp) {
-    if (fp.selectedDates.length) {
-        suppressCalClose = true;
-        fp.clear(false);
-        queueMicrotask(() => { suppressCalClose = false; });
-    }
-    fp.open();
-}
-
-function openCalendar(type) {
-    document.getElementById('calBackdrop').classList.add('active');
-    if (!pickers) {
-        activeCalType = type;
-        return;
-    }
-    activeCalType = type;
-    if (type === 'vacation') {
-        openPeriodPicker(pickers.vacationPicker);
-    } else if (type === 'sick') {
-        openPeriodPicker(pickers.sickPicker);
-    } else if (type === 'custom') {
-        pickers.customPicker.open();
-    }
-}
-
-function closeCalendar() {
-    document.getElementById('calBackdrop').classList.remove('active');
-    if (pickers) {
-        if (pickers.vacationPicker.isOpen) pickers.vacationPicker.close();
-        if (pickers.sickPicker.isOpen)     pickers.sickPicker.close();
-        if (pickers.customPicker.isOpen)   pickers.customPicker.close();
-    }
-    activeCalType = null;
-}
-
-function onCalClose() {
-    if (suppressCalClose) return;
-    document.getElementById('calBackdrop').classList.remove('active');
-    activeCalType = null;
-}
-
-/* ── onDayCreate: highlight holidays ── */
-function onDayCreate(dObj, dStr, fp, dayElem) {
-    const d = dayElem.dateObj;
-    if (!d) return;
-    if (dayElem.classList.contains('prevMonthDay') || dayElem.classList.contains('nextMonthDay')) return;
-    const name = getHolidayName(d.getDate(), d.getMonth() + 1, d.getFullYear());
-    if (name) {
-        dayElem.classList.add('is-holiday');
-        dayElem.setAttribute('title', name);
-    }
-}
-
-/* ── Replace editable month/year controls with static labels ── */
-function staticizeMonthYearHeader(instance) {
-    const { year, month } = getYM();
-    const monthNav = instance.calendarContainer.querySelector('.flatpickr-current-month');
-    if (!monthNav) return;
-
-    const monthDropdown = monthNav.querySelector('.flatpickr-monthDropdown-months');
-    if (monthDropdown) {
-        const monthName = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long' });
-        const span = document.createElement('span');
-        span.className = 'cur-month';
-        span.textContent = monthName;
-        monthDropdown.replaceWith(span);
-    }
-
-    const yearWrapper = monthNav.querySelector('.numInputWrapper');
-    if (yearWrapper && !monthNav.querySelector('.cur-year-static')) {
-        const span = document.createElement('span');
-        span.className = 'cur-year-static';
-        span.textContent = String(year);
-        yearWrapper.replaceWith(span);
-    }
-}
-
-/* ── onReady: close btn + holiday legend + optional done btn ── */
-function makeOnReady(isMultiple) {
-    return function(selectedDates, dateStr, instance) {
-        instance.prevMonthNav.style.display = 'none';
-        instance.nextMonthNav.style.display = 'none';
-
-        staticizeMonthYearHeader(instance);
-
-        const monthNav = instance.calendarContainer.querySelector('.flatpickr-current-month');
-        if (monthNav) { monthNav.style.pointerEvents = 'none'; monthNav.style.cursor = 'default'; }
-
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'cal-close';
-        closeBtn.innerHTML = SVG.close;
-        closeBtn.addEventListener('click', e => { e.stopPropagation(); closeCalendar(); });
-        instance.calendarContainer.querySelector('.flatpickr-months').appendChild(closeBtn);
-
-        const { year, month } = getYM();
-        const list = getHolidayList(year) || [];
-        const monthHols = list.filter(h => h.month === month);
-        if (monthHols.length) {
-            const strip = document.createElement('div');
-            strip.className = 'cal-holiday-strip visible';
-            const names = [...new Set(monthHols.map(h => h.name))];
-            strip.textContent = names.join(' · ');
-            instance.calendarContainer.appendChild(strip);
-        }
-
-        if (isMultiple) {
-            const footer = document.createElement('div');
-            footer.className = 'cal-footer';
-            footer.innerHTML = '<button type="button" class="cal-done">Done</button>';
-            footer.querySelector('.cal-done').addEventListener('click', closeCalendar);
-            instance.calendarContainer.appendChild(footer);
-        }
-    };
-}
-
-/* ── Period picker onChange (type bound at init — no activeCalType race) ── */
-function makePeriodOnChange(type) {
-    return function(dates, dateStr, instance) {
-        if (dates.length !== 2) return;
-        const start = dates[0].getDate();
-        const end   = dates[1].getDate();
-        if (type === 'vacation') {
-            vacationPeriods.push({ start, end });
-            renderPeriodBadges('vacation');
-            syncPeriodInput('vacation');
-        } else {
-            sickPeriods.push({ start, end });
-            renderPeriodBadges('sick');
-            syncPeriodInput('sick');
-        }
-        setTimeout(() => {
-            suppressCalClose = true;
-            instance.clear(false);
-            closeCalendar();
-            updateStats();
-            queueMicrotask(() => { suppressCalClose = false; });
-        }, 150);
-    };
-}
-
-/* ── Calendar init ── */
-function initCalendars() {
-    const { year, month } = getYM();
-    const minDate = new Date(year, month - 1, 1);
-    const maxDate = new Date(year, month,     0);
-
-    const base = {
-        minDate,
-        maxDate,
-        dateFormat: 'd M',
-        clickOpens: false,
-        allowInput: false,
-        monthSelectorType: 'static',
-        onDayCreate,
-        onClose: onCalClose,
-    };
-
-    const rangeBase = {
-        ...base,
-        mode: 'range',
-        onReady: makeOnReady(false),
-    };
-
-    const vacationPicker = flatpickr('#vacationPickerInput', {
-        ...rangeBase,
-        onChange: makePeriodOnChange('vacation'),
-    });
-
-    const sickPicker = flatpickr('#sickPickerInput', {
-        ...rangeBase,
-        onChange: makePeriodOnChange('sick'),
-    });
-
-    const customPicker = flatpickr('#custom_days', {
-        ...base,
-        mode: 'multiple',
-        conjunction: ', ',
-        onChange(dates) {
-            setDateInput('custom_days', fmtDates(dates));
-            updateDisplay('custom', dates);
-            updateStats();
-        },
-        onReady: makeOnReady(true),
-    });
-
-    return { vacationPicker, sickPicker, customPicker };
-}
-
-/* ── Period badge rendering ── */
-function renderPeriodBadges(type) {
-    const { year, month } = getYM();
-    const mName   = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short' });
-    const periods = type === 'vacation' ? vacationPeriods : sickPeriods;
-    const divId   = type === 'vacation' ? 'vacationDisplay' : 'sickDisplay';
-    const div     = document.getElementById(divId);
-
-    div.innerHTML = periods.map((p, i) => {
-        const days  = p.end - p.start + 1;
-        const label = p.start === p.end
-            ? `${mName} ${p.start}`
-            : `${mName} ${p.start}–${p.end} (${days}d)`;
-        return `<div class="date-badge ${type}">
-            <span class="badge-dot"></span>
-            <span>${label}</span>
-            <span class="badge-remove" onclick="removePeriod('${type}',${i})">${SVG.close}</span>
-        </div>`;
-    }).join('');
-}
-
-function removePeriod(type, index) {
-    if (type === 'vacation') {
-        vacationPeriods.splice(index, 1);
-        renderPeriodBadges('vacation');
-        syncPeriodInput('vacation');
-    } else {
-        sickPeriods.splice(index, 1);
-        renderPeriodBadges('sick');
-        syncPeriodInput('sick');
-    }
-    updateStats();
-}
-
-function syncPeriodInput(type) {
-    const periods = type === 'vacation' ? vacationPeriods : sickPeriods;
-    const id      = type === 'vacation' ? 'vacation' : 'sick';
-    const value   = periods.map(p => p.start === p.end ? String(p.start) : `${p.start}-${p.end}`).join(',');
-    setDateInput(id, value);
-}
-
-/* ── Quick vacation: adds a period of N working days ── */
-function addQuickVacation(workDays) {
-    const { year, month } = getYM();
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const hols = new Set(
-        (getHolidayList(year) || []).filter(h => h.month === month).map(h => h.day)
-    );
-
-    // Days already in existing vacation periods
-    const taken = new Set();
-    vacationPeriods.forEach(p => { for (let d = p.start; d <= p.end; d++) taken.add(d); });
-
-    let start = null, end = null, count = 0;
-
-    for (let d = 1; d <= daysInMonth && count < workDays; d++) {
-        const dow = new Date(year, month - 1, d).getDay();
-        if (dow === 0 || dow === 6 || hols.has(d) || taken.has(d)) continue;
-        if (start === null) start = d;
-        end = d;
-        count++;
-    }
-
-    if (start === null) return;
-
-    vacationPeriods.push({ start, end });
-    renderPeriodBadges('vacation');
-    syncPeriodInput('vacation');
-    setTimeout(updateStats, 80);
-}
-
-/* ── Clear functions ── */
-function clearVacation() {
-    vacationPeriods = [];
-    setDateInput('vacation', '');
-    document.getElementById('vacationDisplay').innerHTML = '';
-    updateStats();
-}
-function clearSick() {
-    sickPeriods = [];
-    setDateInput('sick', '');
-    document.getElementById('sickDisplay').innerHTML = '';
-    updateStats();
-}
-function clearCustom() {
-    pickers?.customPicker?.clear();
-    setDateInput('custom_days', '');
-    document.getElementById('customDisplay').innerHTML = '';
-    updateStats();
-}
-
-/* ── setDateInput: keeps value + data-value in sync ── */
-function setDateInput(id, value) {
-    const el = document.getElementById(id);
-    el.value = value;
-    if (value) el.setAttribute('data-value', value);
-    else el.removeAttribute('data-value');
-}
-
-/* ── fmtDates: for custom (multiple) picker ── */
-function fmtDates(dates) {
-    if (!dates || !dates.length) return '';
-    const { year, month } = getYM();
-    const days = dates
-        .filter(d => d.getMonth() + 1 === month && d.getFullYear() === year)
-        .map(d => d.getDate())
-        .sort((a, b) => a - b);
-    if (!days.length) return '';
-    if (days.length === 1) return String(days[0]);
-    let consecutive = true;
-    for (let i = 1; i < days.length; i++) {
-        if (days[i] !== days[i - 1] + 1) { consecutive = false; break; }
-    }
-    return consecutive ? `${days[0]}-${days[days.length - 1]}` : days.join(',');
-}
-
-/* ── updateDisplay: for custom type badge ── */
-function updateDisplay(type, dates) {
-    const { year, month } = getYM();
-    const mName = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short' });
-    const ids   = { vacation: 'vacationDisplay', sick: 'sickDisplay', custom: 'customDisplay' };
-
-    const div = document.getElementById(ids[type]);
-    if (!dates || !dates.length) { div.innerHTML = ''; return; }
-
-    const days = dates.map(d => d.getDate()).sort((a, b) => a - b);
-    let text;
-    if (days.length === 1) {
-        text = `${mName} ${days[0]}`;
-    } else {
-        const isRange = days[days.length - 1] - days[0] === days.length - 1;
-        text = isRange
-            ? `${mName} ${days[0]}–${days[days.length - 1]} (${days.length} days)`
-            : `${days.length} days: ${days.join(', ')}`;
-    }
-
-    div.innerHTML = `<div class="date-badge ${type}">
-        <span class="badge-dot"></span>
-        <span>${text}</span>
-        <span class="badge-remove" onclick="clearCustom()">${SVG.close}</span>
-    </div>`;
-}
-
-/* ── parseDaySet ── */
-function parseDaySet(str) {
-    const set = new Set();
-    if (!str) return set;
-    for (const part of str.split(',')) {
-        const t = part.trim();
-        if (t.includes('-')) {
-            const [a, b] = t.split('-').map(Number);
-            for (let i = a; i <= b; i++) set.add(i);
-        } else {
-            const n = parseInt(t);
-            if (!isNaN(n)) set.add(n);
-        }
-    }
-    return set;
-}
-
-/* ── Stats calculation ── */
-async function calculateStats() {
-    const { year, month } = getYM();
-    const total = new Date(year, month, 0).getDate();
-
-    await loadHolidays(year);
-    const holDays = new Set(
-        (getHolidayList(year) || []).filter(h => h.month === month).map(h => h.day)
-    );
-
-    const vacSet    = parseDaySet(document.getElementById('vacation').getAttribute('data-value') || '');
-    const sickSet   = parseDaySet(document.getElementById('sick').getAttribute('data-value') || '');
-    const customSet = parseDaySet(document.getElementById('custom_days').getAttribute('data-value') || '');
-    const overlap   = [...vacSet].filter(d => sickSet.has(d));
-
-    let working = 0, vacDays = 0, sickDays = 0, customDays = 0;
-
-    for (let d = 1; d <= total; d++) {
-        const dow     = new Date(year, month - 1, d).getDay();
-        const weekend = dow === 0 || dow === 6;
-        const holiday = holDays.has(d);
-        const vac     = vacSet.has(d);
-        const sick    = sickSet.has(d);
-        const custom  = customSet.has(d);
-
-        if (vac)    vacDays++;
-        if (sick)   sickDays++;
-        if (custom) customDays++;
-        if (!weekend && !holiday && !vac && !sick && !custom) working++;
-    }
-
-    return { total, working, holidays: holDays.size, vacDays, sickDays, customDays, hours: working * 8, overlap };
-}
-
-async function updateStats() {
-    const s = await calculateStats();
-
-    document.getElementById('statTotalDays').textContent     = s.total;
-    document.getElementById('statWorkingDays').textContent   = s.working;
-    document.getElementById('statHolidays').textContent      = s.holidays;
-    document.getElementById('statExpectedHours').textContent = s.hours + 'h';
-
-    document.getElementById('statVacation').textContent = s.vacDays   ? s.vacDays   + ' d' : '—';
-    document.getElementById('statSick').textContent     = s.sickDays  ? s.sickDays  + ' d' : '—';
-    document.getElementById('statCustom').textContent   = s.customDays ? s.customDays + ' d' : '—';
-
-    document.getElementById('statsBox').style.display = 'block';
-
-    const hasAbsences = s.vacDays + s.sickDays + s.customDays > 0;
-    document.getElementById('absenceChips').style.display = hasAbsences ? 'flex' : 'none';
-
-    const hint  = document.getElementById('validationHint');
-    const total = s.vacDays + s.sickDays + s.customDays;
-
-    if (s.overlap && s.overlap.length > 0) {
-        hint.className = 'hint warning';
-        hint.innerHTML = `<span class="hint-label">Warning:</span> Vacation and sick overlap on day(s): ${s.overlap.join(', ')}. Sick takes priority in export.`;
-        hint.style.display = 'block';
-    } else if (total > 0) {
-        if (s.working < 5) {
-            hint.className = 'hint warning';
-            hint.innerHTML = `<span class="hint-label">Warning:</span> Only ${s.working} working days this month (${s.hours}h)`;
-        } else {
-            hint.className = 'hint success';
-            hint.innerHTML = `<span class="hint-label">Note:</span> ${total} absence day(s) — ${s.working} working days (${s.hours}h)`;
-        }
-    } else {
-        hint.className = 'hint info';
-        hint.innerHTML = `<span class="hint-label">Info:</span> Full month: ${s.working} working days = ${s.hours} hours`;
-    }
-    hint.style.display = 'block';
-    saveFormState();
-}
-
-/* ── Preview edit helpers ── */
-function isDayLocked(dayNum) {
-    const { year, month } = getYM();
-    const dow = new Date(year, month - 1, dayNum).getDay();
-    if (dow === 0 || dow === 6) return true;
-    const hols = getHolidayList(year).filter(h => h.month === month);
-    return hols.some(h => h.day === dayNum);
-}
-
-function getLockTooltip(dayNum) {
-    const { year, month } = getYM();
-    const dow = new Date(year, month - 1, dayNum).getDay();
-    if (dow === 0 || dow === 6) return 'Weekend — cannot edit';
-    return 'Public holiday — cannot edit';
-}
-
-function initPreviewDays(days) {
-    return days.map(d => ({
-        ...d,
-        locked: isDayLocked(d.day),
-    }));
-}
-
-function daysToRanges(days) {
-    if (!days.length) return '';
-    const sorted = [...days].sort((a, b) => a - b);
-    const ranges = [];
-    let start = sorted[0], end = sorted[0];
-    for (let i = 1; i < sorted.length; i++) {
-        if (sorted[i] === end + 1) end = sorted[i];
-        else {
-            ranges.push(start === end ? String(start) : `${start}-${end}`);
-            start = end = sorted[i];
-        }
-    }
-    ranges.push(start === end ? String(start) : `${start}-${end}`);
-    return ranges.join(',');
-}
-
-function daysToPeriods(days) {
-    if (!days.length) return [];
-    const sorted = [...days].sort((a, b) => a - b);
-    const periods = [];
-    let start = sorted[0], end = sorted[0];
-    for (let i = 1; i < sorted.length; i++) {
-        if (sorted[i] === end + 1) end = sorted[i];
-        else {
-            periods.push({ start, end });
-            start = end = sorted[i];
-        }
-    }
-    periods.push({ start, end });
-    return periods;
-}
-
-function computePreviewSummary() {
-    const hoursPerDay = parseInt(document.getElementById('hours_per_day').value) || 8;
-    let working = 0, holidays = 0, vac = 0, sick = 0, custom = 0;
-    for (const d of previewDays) {
-        if (d.status === 'working')  working++;
-        else if (d.status === 'holiday')  holidays++;
-        else if (d.status === 'vacation') vac++;
-        else if (d.status === 'sick')     sick++;
-        else if (d.status === 'custom')   custom++;
-    }
-    return {
-        total_days:   previewDays.length,
-        working_days: working,
-        total_hours:  working * hoursPerDay,
-        vacation_days: vac,
-        sick_days:     sick,
-        custom_days:   custom,
-        holiday_days:  holidays,
-    };
-}
-
-function cyclePreviewDay(dayNum) {
-    const day = previewDays.find(d => d.day === dayNum);
-    if (!day || day.locked) return;
-
-    const hoursPerDay = parseInt(document.getElementById('hours_per_day').value) || 8;
-    const cur = PREVIEW_EDIT_CYCLE.includes(day.status) ? day.status : 'working';
-    const next = PREVIEW_EDIT_CYCLE[(PREVIEW_EDIT_CYCLE.indexOf(cur) + 1) % PREVIEW_EDIT_CYCLE.length];
-
-    day.status = next;
-    day.hours  = next === 'working' ? hoursPerDay : 0;
-    if (next === 'custom') {
-        day.custom_reason = document.getElementById('custom_reason').value.trim() || 'Other';
-    } else {
-        day.custom_reason = null;
-    }
-    renderPreviewTable();
-}
-
-function renderPreviewTable() {
-    if (!previewDays) return;
-
-    const summary = computePreviewSummary();
-    const defaultReason = document.getElementById('custom_reason').value.trim() || 'Other';
-    let rows = '';
-
-    for (const d of previewDays) {
-        const info = PREVIEW_STATUS_MAP[d.status];
-        let statusTx = info.label;
-        if (d.status === 'holiday') statusTx = d.holiday_name;
-        if (d.status === 'custom')  statusTx = d.custom_reason || defaultReason;
-
-        const rowCls  = d.locked ? 'preview-locked' : 'preview-editable';
-        const title   = d.locked ? getLockTooltip(d.day) : 'Tap to cycle: Working → Vacation → Sick → Other';
-        const icon    = d.locked
-            ? '<span class="preview-lock-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>'
-            : '<span class="preview-edit-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>';
-        const click   = d.locked ? '' : ` onclick="cyclePreviewDay(${d.day})"`;
-        const hoursStr = d.hours > 0 ? `${d.hours}h` : '—';
-
-        rows += `<tr class="${info.cls} ${rowCls}" data-day="${d.day}" title="${title}"${click}>
-            <td>${d.day}</td>
-            <td>${d.date_str}</td>
-            <td class="preview-status-cell">${statusTx} ${icon}</td>
-            <td>${hoursStr}</td>
-        </tr>`;
-    }
-
-    const s = summary;
-    rows += `<tr class="row-summary">
-        <td colspan="3">Total: ${s.working_days} working day${s.working_days !== 1 ? 's' : ''}</td>
-        <td>${s.total_hours}h</td>
-    </tr>`;
-
-    document.getElementById('previewContent').innerHTML = `
-        <p class="preview-hint">Click a day&apos;s status to cycle: Working → Vacation → Sick → Other. Weekends and holidays are locked.</p>
-        <div class="preview-legend">
-            <div class="legend-item"><div class="legend-dot" style="background:#E2E8F0;border:1px solid #CBD5E1"></div> Weekend</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div> Holiday</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--vacation)"></div> Vacation</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--sick)"></div> Sick</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--custom)"></div> Other</div>
-            <div class="legend-item"><div class="legend-dot" style="background:white;border:1px solid var(--border)"></div> Working</div>
-        </div>
-        <div class="preview-table-wrap">
-            <table class="preview-table">
-                <thead>
-                    <tr>
-                        <th style="width:36px">#</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Hours</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>
-        <div class="preview-actions">
-            <button type="button" class="btn-apply-preview" onclick="applyPreviewToForm()">Apply to form</button>
-            <button type="button" class="btn-refresh-preview" onclick="showPreview()">Refresh preview</button>
-        </div>
-        <p class="preview-hint" id="previewApplyHint" style="display:none;margin-top:10px;margin-bottom:0;"></p>`;
-}
-
-function applyPreviewToForm() {
-    if (!previewDays) return;
-
-    const vacDays = [], sickDays = [], customDays = [];
-    for (const d of previewDays) {
-        if (d.status === 'vacation')      vacDays.push(d.day);
-        else if (d.status === 'sick')     sickDays.push(d.day);
-        else if (d.status === 'custom')   customDays.push(d.day);
-    }
-
-    vacationPeriods = daysToPeriods(vacDays);
-    sickPeriods     = daysToPeriods(sickDays);
-
-    renderPeriodBadges('vacation');
-    renderPeriodBadges('sick');
-    syncPeriodInput('vacation');
-    syncPeriodInput('sick');
-
-    const customValue = daysToRanges(customDays);
-    setDateInput('custom_days', customValue);
-
-    const { year, month } = getYM();
-    const customDates = customDays.map(d => new Date(year, month - 1, d));
-    if (pickers?.customPicker) {
-        pickers.customPicker.setDate(customDates, false);
-    }
-    updateDisplay('custom', customDates);
-
-    updateStats();
-
-    const hint = document.getElementById('previewApplyHint');
-    if (hint) {
-        hint.textContent = 'Applied to form — monthly summary updated';
-        hint.className = 'preview-hint success';
-        hint.style.display = 'block';
-    }
-}
-
-/* ── Preview ── */
-async function showPreview() {
-    const form     = document.getElementById('timesheetForm');
-    const formData = new FormData(form);
-
-    ['vacation', 'sick', 'custom_days'].forEach(id => {
-        const val = document.getElementById(id).getAttribute('data-value') || '';
-        formData.set(id, val);
-    });
-
-    const previewSection = document.getElementById('previewSection');
-    const previewContent = document.getElementById('previewContent');
-    const previewBtn     = document.getElementById('previewBtn');
-    const monthLabel     = document.getElementById('previewMonthLabel');
-
-    previewBtn.disabled  = true;
-    previewBtn.innerHTML = 'Loading…';
-
-    try {
-        const { year } = getYM();
-        await loadHolidays(year);
-
-        const resp = await fetch('/preview', { method: 'POST', body: formData });
-        const data = await resp.json();
-        if (data.error) throw new Error(data.error);
-
-        monthLabel.textContent = `— ${data.month} ${data.year}`;
-        previewDays = initPreviewDays(data.days);
-        renderPreviewTable();
-
-        previewSection.style.display = 'block';
-        previewSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-    } catch (err) {
-        previewDays = null;
-        previewContent.innerHTML = `<div class="result error" style="display:block"><h3>Error</h3><p>${err.message}</p></div>`;
-        previewSection.style.display = 'block';
-    } finally {
-        previewBtn.disabled  = false;
-        previewBtn.innerHTML = PREVIEW_BTN_HTML;
-    }
-}
-
-function closePreview() {
-    document.getElementById('previewSection').style.display = 'none';
-    document.getElementById('previewContent').innerHTML = '';
-    previewDays = null;
-}
-
-/* ── Reinitialize on month/year change ── */
-async function reinit() {
-    if (pickers) {
-        pickers.vacationPicker.destroy();
-        pickers.sickPicker.destroy();
-        pickers.customPicker.destroy();
-        pickers = null;
-    }
-
-    // Clear all periods and selections
-    vacationPeriods = [];
-    sickPeriods     = [];
-    ['vacation', 'sick', 'custom_days'].forEach(id => setDateInput(id, ''));
-    ['vacationDisplay', 'sickDisplay', 'customDisplay'].forEach(id => {
-        document.getElementById(id).innerHTML = '';
-    });
-    closePreview();
-
-    const { year } = getYM();
-    await loadHolidays(year);
-    pickers = initCalendars();
-    updateStats();
-}
-
-/* ── Bootstrap ── */
-async function init() {
-    loadFormState();
-    const { year } = getYM();
-    await loadHolidays(year);
-    pickers = initCalendars();
-
-    const customVal = document.getElementById('custom_days').getAttribute('data-value');
-    if (customVal && pickers?.customPicker) {
-        const { year: y, month: m } = getYM();
-        const dates = [];
-        customVal.split(',').forEach(part => {
-            const t = part.trim();
-            if (!t) return;
-            if (t.includes('-')) {
-                const [a, b] = t.split('-').map(Number);
-                for (let d = a; d <= b; d++) dates.push(new Date(y, m - 1, d));
-            } else {
-                dates.push(new Date(y, m - 1, parseInt(t, 10)));
-            }
-        });
-        if (dates.length) {
-            pickers.customPicker.setDate(dates, false);
-            updateDisplay('custom', dates);
-        }
-    }
-    updateStats();
-}
-
-init();
-
-document.getElementById('year').addEventListener('change',  reinit);
-document.getElementById('month').addEventListener('change', reinit);
-['employee_name', 'custom_reason'].forEach(id => {
-    document.getElementById(id).addEventListener('input', saveFormState);
-});
-document.querySelectorAll('input[name="format"]').forEach(el => {
-    el.addEventListener('change', saveFormState);
-});
-
-/* ── Form submit ── */
-document.getElementById('timesheetForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const form     = e.target;
-    const formData = new FormData(form);
-
-    // Sync data-value for hidden date fields
-    ['vacation', 'sick', 'custom_days'].forEach(id => {
-        const val = document.getElementById(id).getAttribute('data-value') || '';
-        formData.set(id, val);
-    });
-
-    const btn     = document.getElementById('generateBtn');
-    const loading = document.getElementById('loading');
-    const result  = document.getElementById('result');
-
-    btn.disabled          = true;
-    loading.style.display = 'block';
-    result.style.display  = 'none';
-
-    const fmt = getSelectedFormat();
-    document.getElementById('loadingText').textContent =
-        fmt === 'xlsx' ? 'Generating Excel…' : 'Generating PDF…';
-
-    try {
-        const resp = await fetch('/generate', { method: 'POST', body: formData });
-        const ct   = resp.headers.get('content-type') || '';
-
-        if (isDownloadResponse(ct)) {
-            const blob = await resp.blob();
-            const url  = URL.createObjectURL(blob);
-            const a    = Object.assign(document.createElement('a'), { href: url });
-
-            const cd   = resp.headers.get('content-disposition') || '';
-            const m    = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            const defaultName = fmt === 'xlsx' ? 'timesheet.xlsx' : 'timesheet.pdf';
-            a.download = m ? m[1].replace(/['"]/g, '') : defaultName;
-
-            document.body.appendChild(a);
-            a.click();
-            URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-
-            result.className = 'result success';
-            result.innerHTML = fmt === 'xlsx'
-                ? '<h3>Success</h3><p>Excel file downloaded — check your Downloads folder.</p>'
-                : '<h3>Success</h3><p>PDF downloaded — check your Downloads folder.</p>';
-        } else {
-            const data = await resp.json();
-            throw new Error(data.error || 'Unknown error');
-        }
-    } catch (err) {
-        result.className = 'result error';
-        result.innerHTML = `<h3>Error</h3><p>${err.message}</p>`;
-    } finally {
-        btn.disabled          = false;
-        loading.style.display = 'none';
-        result.style.display  = 'block';
-    }
-});
-
-document.getElementById('submitBtn').addEventListener('click', async () => {
-    const form     = document.getElementById('timesheetForm');
-    const formData = new FormData(form);
-
-    ['vacation', 'sick', 'custom_days'].forEach(id => {
-        const val = document.getElementById(id).getAttribute('data-value') || '';
-        formData.set(id, val);
-    });
-
-    const btn     = document.getElementById('submitBtn');
-    const loading = document.getElementById('loading');
-    const result  = document.getElementById('result');
-
-    btn.disabled          = true;
-    loading.style.display = 'block';
-    result.style.display  = 'none';
-    document.getElementById('loadingText').textContent = 'Submitting…';
-
-    try {
-        const resp = await fetch('/timesheets/submit', { method: 'POST', body: formData });
-        const data = await resp.json();
-        if (data.ok) {
-            result.className = 'result success';
-            result.innerHTML = '<h3>Submitted</h3><p>The accountant received this timesheet and can download it.</p>';
-        } else {
-            throw new Error(data.error || 'Could not submit timesheet.');
-        }
-    } catch (err) {
-        result.className = 'result error';
-        result.innerHTML = `<h3>Error</h3><p>${err.message}</p>`;
-    } finally {
-        btn.disabled          = false;
-        loading.style.display = 'none';
-        result.style.display  = 'block';
-    }
-});
-</script>
+<script id="timesheet-copy" type="application/json">{
+    "locale": "en-US",
+    "calendarLocale": "en",
+    "submitLabel": {{ t('timesheet.submit_to_accountant') | tojson }},
+    "preview": {{ t('timesheet.preview') | tojson }},
+    "downloadCopy": {{ t('timesheet.download_copy') | tojson }},
+    "loading": {{ t('common.loading') | tojson }},
+    "generatingPdf": {{ t('timesheet.generating_pdf') | tojson }},
+    "generatingExcel": {{ t('timesheet.generating_excel') | tojson }},
+    "submitting": {{ t('timesheet.submitting') | tojson }},
+    "success": {{ t('common.success') | tojson }},
+    "error": {{ t('common.error') | tojson }},
+    "submitted": {{ t('timesheet.submitted') | tojson }},
+    "submittedMessage": {{ t('timesheet.submitted_message') | tojson }},
+    "downloadPdfSuccess": {{ t('timesheet.pdf_downloaded') | tojson }},
+    "downloadExcelSuccess": {{ t('timesheet.excel_downloaded') | tojson }},
+    "requestFailed": {{ t('timesheet.request_failed') | tojson }},
+    "previewFailed": {{ t('timesheet.preview_failed') | tojson }},
+    "submitFailed": {{ t('timesheet.submit_failed') | tojson }},
+    "working": {{ t('timesheet.working') | tojson }},
+    "weekend": {{ t('timesheet.weekend') | tojson }},
+    "holiday": {{ t('timesheet.holiday') | tojson }},
+    "vacation": {{ t('timesheet.vacation') | tojson }},
+    "sick": {{ t('timesheet.sick') | tojson }},
+    "other": {{ t('timesheet.other') | tojson }},
+    "date": {{ t('timesheet.date') | tojson }},
+    "status": {{ t('timesheet.status') | tojson }},
+    "applyToForm": {{ t('timesheet.apply_to_form') | tojson }},
+    "refreshPreview": {{ t('timesheet.refresh_preview') | tojson }},
+    "previewHint": {{ t('timesheet.preview_hint') | tojson }},
+    "cycleHint": {{ t('timesheet.cycle_hint') | tojson }},
+    "weekendLocked": {{ t('timesheet.weekend_locked') | tojson }},
+    "holidayLocked": {{ t('timesheet.holiday_locked') | tojson }},
+    "previewApplied": {{ t('timesheet.preview_applied') | tojson }},
+    "done": {{ t('common.done') | tojson }},
+    "warning": {{ t('common.warning') | tojson }},
+    "note": {{ t('common.note') | tojson }},
+    "info": {{ t('common.info') | tojson }},
+    "overlapHint": {{ t('timesheet.overlap_hint') | tojson }},
+    "fewWorkingDays": {{ t('timesheet.few_working_days') | tojson }},
+    "absenceSummary": {{ t('timesheet.absence_summary') | tojson }},
+    "fullMonth": {{ t('timesheet.full_month') | tojson }},
+    "totalWorkingDays": {{ t('timesheet.total_working_days') | tojson }},
+    "hours": {{ t('common.hours') | tojson }},
+    "dayShort": {{ t('common.day_short') | tojson }},
+    "requiredField": {{ t('timesheet.required_field') | tojson }}
+}</script>
+</main>
 </body>
 </html>
