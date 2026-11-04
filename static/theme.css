@@ -40,7 +40,7 @@ html[data-theme=dark] #leave-drawer .flatpickr-day:hover,html[data-theme=dark] #
 html[data-theme=dark] #leave-drawer .flatpickr-day.today{background:var(--theme-raised)!important}
 html[data-theme=dark] #leave-drawer .flatpickr-day.selected{background:#156eaa!important;color:#fff!important}
 @media(max-width:820px){.theme-toggle{width:40px;height:40px}.people-topbar-actions{flex-wrap:wrap}.people-topbar-actions>.theme-toggle{order:3}.people-topbar-actions>.account-signout{order:4}.people-topbar-actions>.demo-role-selector{flex-basis:calc(100% - 50px)}.people-topbar-actions>.company-identity{flex:1}}
-html[data-theme=dark] .people-app .people-brand-logo,html[data-theme=dark] .login-brand{filter:brightness(1.8) saturate(.75)}
+html[data-theme=dark] .people-app .people-brand-logo,html[data-theme=dark] .login-brand{filter:brightness(3.5) saturate(.65)}
 html[data-theme=dark] .people-app :is(.demo-role-selector,.demo-role-selector button,.home-days-label,.home-balance-label,.balance-unit,.home-month-footer>span,.home-balance-numbers span,.status-draft){background:var(--theme-raised)!important;color:var(--theme-muted)!important;border-color:var(--theme-border)!important}
 html[data-theme=dark] .people-app .demo-role-selector button[aria-pressed=true]{background:#284d6d!important;color:#b9e1ff!important}
 html[data-theme=dark] .people-app .button.primary{background:#156eaa!important;color:#fff!important;border-color:#2786bf!important}
