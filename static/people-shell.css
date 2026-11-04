@@ -258,7 +258,7 @@ body:has(.leave-drawer[open]) {overflow:hidden}
 .demo-role-selector button {border:0;min-height:32px;padding:7px 11px;border-radius:6px;background:transparent;color:#7b90a6;font:600 11px/1.5 "Open Sans",Arial,sans-serif;cursor:pointer}
 .demo-role-selector button[aria-pressed="true"] {color:#0c71c3;background:#fff;box-shadow:0 1px 4px #1a497412}
 .demo-role-selector button:disabled {opacity:.6;cursor:wait}
-.people-app[data-demo-role="accountant"][data-active-section="approvals"] .profile-selector,.people-app[data-demo-role="accountant"][data-active-section="people"] .profile-selector {display:none}
+.people-app[data-demo-role="accountant"][data-active-section="approvals"] .profile-selector:not(.company-identity),.people-app[data-demo-role="accountant"][data-active-section="people"] .profile-selector:not(.company-identity) {display:none}
 .form-draft-status {font-size:10px!important;color:#7593ab!important;margin:10px 0 0!important;letter-spacing:0!important}
 .people-app .drawer-body .form-draft-status {margin-top:0!important}
 .people-app .period-status {display:flex;align-items:center;justify-content:space-between;gap:20px;padding:17px 25px;margin:22px 30px 0;border:1px solid #d8eafa;background:#f1f8ff;border-radius:9px;color:#3d719c}
