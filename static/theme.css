@@ -20,7 +20,6 @@ html[data-theme=dark] .people-app :is(.status-accepted,.badge.accepted,.calendar
 html[data-theme=dark] .people-app :is(.status-needs_changes,.badge.needs_changes,.form-inline-error,.drawer-error,.assessment-message.error,.hint.error){background:#482b32!important;color:#ffc0c0!important;border-color:#74434e!important}
 html[data-theme=dark] .people-app :is(.status-draft,.calendar-event,.status-badge){border-color:var(--theme-border)}
 html[data-theme=dark] .people-app :is(.absence-card,.office-hours-editor,.record-filter,.review-details,.review-facts,.assessment-team li,td,th,.calendar-grid,.calendar-cell,.people-company){border-color:var(--theme-border)!important}
-html[data-theme=dark] .people-app .people-brand-logo{filter:brightness(0) invert(1)}
 html[data-theme=dark] .people-app .document-pages{background:#0b1420!important}
 html[data-theme=dark] .people-app dialog::backdrop{background:#020810b8}
 html[data-theme=dark] .people-app .workspace-toast{background:#243b53;color:var(--theme-ink);border-color:var(--theme-border)}
@@ -40,7 +39,6 @@ html[data-theme=dark] #leave-drawer .flatpickr-day:hover,html[data-theme=dark] #
 html[data-theme=dark] #leave-drawer .flatpickr-day.today{background:var(--theme-raised)!important}
 html[data-theme=dark] #leave-drawer .flatpickr-day.selected{background:#156eaa!important;color:#fff!important}
 @media(max-width:820px){.theme-toggle{width:40px;height:40px}.people-topbar-actions{flex-wrap:wrap}.people-topbar-actions>.theme-toggle{order:3}.people-topbar-actions>.account-signout{order:4}.people-topbar-actions>.demo-role-selector{flex-basis:calc(100% - 50px)}.people-topbar-actions>.company-identity{flex:1}}
-html[data-theme=dark] .people-app .people-brand-logo,html[data-theme=dark] .login-brand{filter:brightness(3.5) saturate(.65)}
 html[data-theme=dark] .people-app :is(.demo-role-selector,.demo-role-selector button,.home-days-label,.home-balance-label,.balance-unit,.home-month-footer>span,.home-balance-numbers span,.status-draft){background:var(--theme-raised)!important;color:var(--theme-muted)!important;border-color:var(--theme-border)!important}
 html[data-theme=dark] .people-app .demo-role-selector button[aria-pressed=true]{background:#284d6d!important;color:#b9e1ff!important}
 html[data-theme=dark] .people-app .button.primary{background:#156eaa!important;color:#fff!important;border-color:#2786bf!important}
@@ -104,3 +102,7 @@ html[data-theme=dark] .people-app .optional{color:var(--theme-muted)!important}
 html[data-theme=dark] .people-app .flatpickr-day.selected.today{background:#156eaa!important;color:#fff!important}
 html[data-theme=dark] .people-app .presence-label{color:var(--theme-muted)!important}
 html[data-theme=dark] .people-app .record-filter button>span{background:#25435d!important;color:#b5dfff!important}
+.brand-lockup{position:relative;display:block;width:fit-content;max-width:100%}.brand-lockup>img{margin-bottom:0}.brand-wordmark{display:none}.people-brand .brand-lockup{margin-bottom:12px}
+html[data-theme=dark] .brand-lockup>img{filter:hue-rotate(25deg) saturate(1.05) brightness(.85)}
+html[data-theme=dark] .brand-wordmark{display:block;position:absolute;inset:0;background:#d4e1f1;mask:url('/static/brand/urchin-systems.png') center/100% 100% no-repeat;clip-path:inset(0 0 0 47%);pointer-events:none}
+@media(max-width:820px){.people-brand .brand-lockup{margin-bottom:0}}

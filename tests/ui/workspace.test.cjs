@@ -10,12 +10,19 @@ async function until(predicate){
   for(let n=0;n<100;n++){if(predicate())return;await new Promise(resolve=>setTimeout(resolve,5));}
   throw new Error('UI did not settle');
 }
-function setup({realTimesheet=false,approvedVacation='',approvedAbsences=[],savedSheet=null,productionRole=null,adminPage=null}={}){
+function setup({realTimesheet=false,approvedVacation='',approvedAbsences=[],savedSheet=null,productionRole=null,adminPage=null,fakeIntervals=false}={}){
   const errors=[],calls=[];let selected=productionRole?String(fixtures.production_people[productionRole]):'1',failRoute=null,demoMode=productionRole==='accountant'?'accountant':'employee',reviewError=null,heldPath=null,heldRequest=null,releaseRequest=null,expiredPath=null;
   const console=new VirtualConsole();console.on('jsdomError',error=>errors.push(error.message));
   const dom=new JSDOM(productionRole?fixtures.production[productionRole]['/timesheet']:fixtures['1']['/timesheet'],{url:origin+'/timesheet',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:console});
   const w=dom.window,d=w.document;
   w.scrollTo=()=>{};
+  const intervals=new Map();let intervalId=0,visible=true;
+  if(fakeIntervals){
+    w.setInterval=(callback)=>{const id=++intervalId;intervals.set(id,callback);return id;};
+    w.clearInterval=id=>intervals.delete(id);
+  }
+  Object.defineProperty(d,'hidden',{configurable:true,get:()=>!visible});
+  Object.defineProperty(d,'visibilityState',{configurable:true,get:()=>visible?'visible':'hidden'});
   w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
   w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
   w.URL.createObjectURL=()=> 'blob:https://people.example/test-pdf';w.URL.revokeObjectURL=()=>{};
@@ -57,6 +64,10 @@ function setup({realTimesheet=false,approvedVacation='',approvedAbsences=[],save
   for(const file of ['workspace-core.js','workspace-drafts.js','people-experience.js','office-view.js','leave-date-picker.js','workspace.js'])w.eval(readFileSync(resolve(root,'static',file),'utf8'));
   return {w,d,calls,errors,fail(path){failRoute=path;},rejectReview(message){reviewError=message;},
     expire(path){expiredPath=path;},
+    setApprovedVacation(value){approvedVacation=value;},
+    setApprovedAbsences(value){approvedAbsences=value;},
+    setVisibility(value){visible=value;d.dispatchEvent(new w.Event('visibilitychange'));},
+    async tickIntervals(){await Promise.all(Array.from(intervals.values(),callback=>callback()));},
     hold(path){heldPath=path;heldRequest=new Promise(resolve=>{releaseRequest=resolve;});},
     release(){heldPath=null;releaseRequest?.();},close(){w.close();}};
 }
@@ -480,4 +491,95 @@ test('leave range can cross a year boundary and stays ISO-formatted for submissi
     const sent=app.calls.find(call=>call.path==='/leave/submit').options.body;
     assert.equal(sent.get('start_date'),'2026-12-30');assert.equal(sent.get('end_date'),'2027-01-04');assert.deepEqual(app.errors,[]);
   }finally{app.close();}
+});
+
+
+async function novemberEditor(app){
+  const {d,w}=app;await until(()=>d.querySelector('#people-view').dataset.viewReady==='ready');
+  if(d.querySelector('#year').value!=='2026'||d.querySelector('#month').value!=='11'){
+    d.querySelector('#year').value='2026';d.querySelector('#month').value='11';
+    d.querySelector('#month').dispatchEvent(new w.Event('change',{bubbles:true}));
+    await until(()=>d.querySelector('#people-view').dataset.viewReady==='ready');
+  }
+}
+
+test('returning to an open month and background refresh apply approvals without losing its draft',async()=>{
+  const app=setup({realTimesheet:true,productionRole:'employee',fakeIntervals:true});try{
+    const {d,w}=app;await novemberEditor(app);const editor=d.querySelector('#people-view');
+    d.querySelector('#sickPickerInput')._flatpickr.setDate(w.Array.of(new w.Date(2026,10,5),new w.Date(2026,10,5)),true);
+    await until(()=>d.querySelector('#sick').value==='5'&&d.querySelector('#statExpectedHours').textContent==='160 Hours');
+    const reason=d.querySelector('#custom_reason');reason.value='Keep this draft reason';reason.dispatchEvent(new w.Event('input',{bubbles:true}));
+    const excel=d.querySelector('input[name=format][value=xlsx]');excel.checked=true;excel.dispatchEvent(new w.Event('change',{bubbles:true}));
+    app.setApprovedVacation('12');w.dispatchEvent(new w.Event('focus'));
+    await until(()=>d.querySelector('#vacation').value==='12'&&d.querySelector('#statExpectedHours').textContent==='152 Hours');
+    app.setApprovedVacation('12-13');await app.tickIntervals();
+    await until(()=>d.querySelector('#vacation').value==='12-13'&&d.querySelector('#statExpectedHours').textContent==='144 Hours');
+    await app.tickIntervals();
+    assert.equal(d.querySelector('#people-view'),editor);assert.equal(w.location.pathname,'/timesheet');
+    assert.equal(d.querySelector('#sick').value,'5');assert.equal(reason.value,'Keep this draft reason');assert.equal(excel.checked,true);
+    assert.equal(d.querySelector('#statExpectedHours').textContent,'144 Hours');assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
+});
+
+test('background month refresh pauses while hidden or in another section and resumes on return',async()=>{
+  const app=setup({realTimesheet:true,productionRole:'employee',fakeIntervals:true});try{
+    const {d,w}=app;await novemberEditor(app);const editor=d.querySelector('#people-view');
+    const requests=()=>app.calls.filter(call=>call.path==='/timesheets/period').length;
+    app.setVisibility(false);const beforeHidden=requests();app.setApprovedVacation('12-13');
+    w.dispatchEvent(new w.Event('focus'));await app.tickIntervals();assert.equal(requests(),beforeHidden);
+    assert.equal(d.querySelector('#statExpectedHours').textContent,'168 Hours');
+    app.setVisibility(true);await until(()=>d.querySelector('#statExpectedHours').textContent==='152 Hours');
+    await w.PeopleWorkspace.navigate('/leave');const beforePaused=requests();
+    w.dispatchEvent(new w.Event('focus'));await app.tickIntervals();assert.equal(requests(),beforePaused);
+    app.setApprovedVacation('12-13,16');await w.PeopleWorkspace.navigate('/timesheet');
+    await until(()=>d.querySelector('#statExpectedHours').textContent==='144 Hours');
+    assert.equal(d.querySelector('#people-view'),editor);assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
+});
+
+test('refresh removes withdrawn approved dates while preserving manually entered absences',async()=>{
+  const app=setup({realTimesheet:true,approvedVacation:'12-13',fakeIntervals:true});try{
+    const {d,w}=app;await novemberEditor(app);
+    d.querySelector('#vacationPickerInput')._flatpickr.setDate(w.Array.of(new w.Date(2026,10,9),new w.Date(2026,10,9)),true);
+    await until(()=>d.querySelector('#vacation').value==='9,12-13');
+    d.querySelector('#custom_reason').value='Keep the manual draft';
+    app.setApprovedVacation('');await w.PeopleWorkspace.navigate('/leave');await w.PeopleWorkspace.navigate('/timesheet');
+    await until(()=>d.querySelector('#vacation').value==='9');
+    assert.equal(d.querySelector('#custom_reason').value,'Keep the manual draft');
+    assert.equal(d.querySelector('#statExpectedHours').textContent,'160 Hours');
+    assert.equal(d.querySelector('#vacationDisplay .approved-period'),null);assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
+});
+
+test('a late background approval response cannot rewrite a document while it is downloading',async()=>{
+  const app=setup({realTimesheet:true,productionRole:'employee',fakeIntervals:true});let finishDownload;try{
+    const {d,w}=app;await novemberEditor(app);
+    const form=d.querySelector('#timesheetForm'),editor=d.querySelector('#people-view');
+    const reason=d.querySelector('#custom_reason');reason.value='Keep the downloading snapshot';reason.dispatchEvent(new w.Event('input',{bubbles:true}));
+    const draftKey=w.WorkspaceCore.periodDraftKey(String(fixtures.production_people.employee),2026,11);
+    const beforeDraft=w.localStorage.getItem(draftKey);assert.ok(beforeDraft,'The employee draft must exist before downloading');
+    const nativeClick=w.HTMLAnchorElement.prototype.click;w.HTMLAnchorElement.prototype.click=function(){if(!this.download)nativeClick.call(this);};
+    let downloadStarted=false,periodDelivered=false,sentDownload;
+    const pendingDownload=new Promise(resolve=>{finishDownload=resolve;}),priorFetch=w.fetch;
+    w.fetch=async(value,options={})=>{
+      const path=new URL(String(value),origin).pathname;
+      if(path==='/generate'){downloadStarted=true;sentDownload=options.body;return pendingDownload;}
+      const response=await priorFetch(value,options);if(path==='/timesheets/period')periodDelivered=true;return response;
+    };
+    app.hold('/timesheets/period');app.setApprovedVacation('12-13');
+    const periodCount=app.calls.filter(call=>call.path==='/timesheets/period').length;
+    w.dispatchEvent(new w.Event('focus'));
+    await until(()=>app.calls.filter(call=>call.path==='/timesheets/period').length>periodCount);
+    form.requestSubmit();await until(()=>downloadStarted);assert.equal(form.inert,true);
+    assert.equal(sentDownload.get('vacation'),'');
+    app.release();await until(()=>periodDelivered);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(d.querySelector('#vacation').value,'','The download must keep the absence snapshot it started with');
+    assert.equal(d.querySelector('#statExpectedHours').textContent,'168 Hours');
+    assert.equal(reason.value,'Keep the downloading snapshot');assert.equal(w.localStorage.getItem(draftKey),beforeDraft);
+    assert.equal(form.inert,true);assert.equal(d.querySelector('#people-view'),editor);
+    finishDownload(new Response('%PDF-test',{headers:{'content-type':'application/pdf'}}));
+    await until(()=>!d.querySelector('#generateBtn').disabled);
+    await app.tickIntervals();await until(()=>d.querySelector('#vacation').value==='12-13'&&d.querySelector('#statExpectedHours').textContent==='152 Hours');
+    assert.equal(reason.value,'Keep the downloading snapshot');assert.deepEqual(app.errors,[]);
+  }finally{finishDownload?.(new Response('%PDF-test',{headers:{'content-type':'application/pdf'}}));app.release();app.close();}
 });

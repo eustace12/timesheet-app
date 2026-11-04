@@ -10,7 +10,7 @@
 {% set page = request.path %}
 {% set timeoff = page in ['/leave', '/leave-balances', '/team-calendar'] %}
 <aside class="people-sidebar" data-demo-role="{{ demo_role }}">
-  <div class="people-brand" aria-label="Urchin People"><img class="people-brand-logo" src="/static/brand/urchin-systems.png" width="1204" height="512" alt="Urchin Systems"><div class="people-brand-caption"><span class="people-product-name">People</span><span class="people-product-description">Time &amp; leave</span></div></div>
+  <div class="people-brand" aria-label="Urchin People"><span class="brand-lockup"><img class="people-brand-logo" src="/static/brand/urchin-systems.png" width="1204" height="512" alt="Urchin Systems"><span class="brand-wordmark" aria-hidden="true"></span></span><div class="people-brand-caption"><span class="people-product-name">People</span><span class="people-product-description">Time &amp; leave</span></div></div>
   <div class="nav-group personal-nav"><p class="people-nav-label"><span class="employee-only">MY WORKSPACE</span><span class="accountant-only">{{ 'MY WORKSPACE' if is_production else 'EMPLOYEE PREVIEW' }}</span></p>
   <nav aria-label="Main navigation" class="people-nav">
     <a href="/" {% if page in ['/', '/workspace'] %}class="selected" aria-current="page"{% endif %}>{{ icon('home') }}<span>Home</span></a>

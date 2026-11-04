@@ -10,6 +10,7 @@ let holidaysCache    = {};
 const STORAGE_KEY = WorkspaceCore.draftKey(person);
 const LAST_PERIOD_KEY = 'timesheetLastPeriodV3:'+person;
 let periodCursor=null,periodInfo=null,periodRevision=0,initialized=false;
+let viewActive=false,backgroundTimer=null,backgroundRequest=null;
 const isPeriodLocked=()=>Boolean(periodInfo?.timesheet&&['submitted','accepted'].includes(periodInfo.timesheet.status));
 let activeCalType    = null;  // 'vacation' | 'sick' | 'custom'
 let suppressCalClose = false; // skip onCalClose during programmatic clear()
@@ -120,8 +121,11 @@ function periodDraft(target){
 function saveFormState(target=periodCursor||getYM(),force=false){
   if(!force&&root.dataset.viewReady==='loading')return;
   try{
+    // Approved days belong to the server, rather than to the employee's draft.
+    const approved=new Set(parseDaySet(periodInfo?.approved_vacation||''));
+    const manualVacation=Array.from(parseDaySet(byId('vacation').getAttribute('data-value')||'')).filter(day=>!approved.has(day));
     const state={year:target.year,month:target.month,custom_reason:byId('custom_reason').value,
-      format:getSelectedFormat(),vacation:byId('vacation').getAttribute('data-value')||'',
+      format:getSelectedFormat(),vacation:daysToRanges(manualVacation),
       sick:byId('sick').getAttribute('data-value')||'',custom_days:byId('custom_days').getAttribute('data-value')||''};
     localStorage.setItem(WorkspaceCore.periodDraftKey(person,target.year,target.month),JSON.stringify(state));
     localStorage.setItem(LAST_PERIOD_KEY,JSON.stringify({year:target.year,month:target.month}));
@@ -172,18 +176,42 @@ async function getPeriodInfo(target){
     if(!response.ok)throw new Error();return await response.json();
   }catch{return {unavailable:true,timesheet:null,approved_vacation:''};}
 }
-async function refreshPeriod(){
-  const target=getYM(),version=++periodRevision,info=await getPeriodInfo(target);
+async function refreshPeriod({background=false}={}){
+  const target=getYM(),version=++periodRevision,previousApproved=parseDaySet(periodInfo?.approved_vacation||'');
+  const info=await getPeriodInfo(target);
   if(disposed||version!==periodRevision)return;
+  if(background&&(!viewActive||document.hidden||documentPending||root.dataset.viewReady==='loading'))return;
+  if(info.unavailable){periodInfo={...periodInfo,unavailable:true};renderPeriodStatus();return;}
   periodInfo=info;
   if(isPeriodLocked()){
     applyPeriodValues(target);await updateStats();
   }else{
-    const union=new Set([...parseDaySet(byId('vacation').getAttribute('data-value')||''),...parseDaySet(info.approved_vacation||'')]);
-    vacationPeriods=periodsFromString(daysToRanges(Array.from(union)));syncPeriodInput('vacation');renderPeriodBadges('vacation');await updateStats();
+    const manual=Array.from(parseDaySet(byId('vacation').getAttribute('data-value')||'')).filter(day=>!previousApproved.has(day));
+    const merged=new Set([...manual,...parseDaySet(info.approved_vacation||'')]);
+    vacationPeriods=periodsFromString(daysToRanges(Array.from(merged)));syncPeriodInput('vacation');renderPeriodBadges('vacation');await updateStats();
   }
   renderPeriodStatus();
 }
+function stopBackgroundRefresh(){
+  if(backgroundTimer!==null)window.clearInterval(backgroundTimer);
+  backgroundTimer=null;
+}
+function refreshVisiblePeriod(){
+  if(!viewActive||disposed||document.hidden||!initialized||documentPending||root.dataset.viewReady==='loading')return;
+  if(!backgroundRequest){
+    backgroundRequest=refreshPeriod({background:true}).catch(()=>{
+      if(!disposed){periodInfo={...periodInfo,unavailable:true};renderPeriodStatus();}
+    }).finally(()=>{backgroundRequest=null;});
+  }
+  return backgroundRequest;
+}
+function watchVisiblePeriod(){
+  stopBackgroundRefresh();
+  if(viewActive&&!disposed&&!document.hidden)backgroundTimer=window.setInterval(refreshVisiblePeriod,30000);
+}
+function visibilityChanged(){watchVisiblePeriod();if(!document.hidden)refreshVisiblePeriod();}
+window.addEventListener('focus',refreshVisiblePeriod);
+document.addEventListener('visibilitychange',visibilityChanged);
 
 function getHolidayName(day, month, year) {
     const list = getHolidayList(year);
@@ -880,5 +908,9 @@ byId('submitBtn').addEventListener('click', async () => {
     }
 });
 const handlers = {clearVacation,clearSick,clearCustom,addQuickVacation,openCalendar,updateGenerateLabel,showPreview,closeCalendar,removePeriod};
-return {ready,activate(){Object.assign(window,handlers);if(initialized&&root.dataset.viewReady!=='loading')refreshPeriod();}, pause(){closeCalendar();saveFormState();}, destroy(){disposed=true;closeCalendar();if(pickers)Object.values(pickers).forEach(p=>p.destroy());}};
+return {ready,
+  activate(){viewActive=true;Object.assign(window,handlers);watchVisiblePeriod();refreshVisiblePeriod();},
+  pause(){viewActive=false;stopBackgroundRefresh();closeCalendar();saveFormState();},
+  destroy(){disposed=true;viewActive=false;stopBackgroundRefresh();window.removeEventListener('focus',refreshVisiblePeriod);document.removeEventListener('visibilitychange',visibilityChanged);closeCalendar();if(pickers)Object.values(pickers).forEach(p=>p.destroy());}
+};
 };
