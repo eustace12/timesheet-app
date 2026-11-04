@@ -474,8 +474,9 @@ let submittingLeave=false,estimateVersion=0;
 function openLeave(trigger){
   if(switching||person==='none')return;
   active.controller?.pause();
-  if(trigger?.dataset.leaveCopy){try{const values=JSON.parse(trigger.dataset.leaveCopy);for(const [name,value] of Object.entries(values))if(leaveForm.elements[name])leaveForm.elements[name].value=value;leaveForm.dataset.dirty='true';drafts.capture(leaveForm,person);updateEstimate();}catch{}}
+  if(trigger?.dataset.leaveCopy){try{const values=JSON.parse(trigger.dataset.leaveCopy);for(const [name,value] of Object.entries(values))if(leaveForm.elements[name])leaveForm.elements[name].value=value;leaveForm.dataset.dirty='true';drafts.capture(leaveForm,person);}catch{}}
   dialog.querySelector('#leaveResult').hidden=true;
+  updateEstimate();
   if(!dialog.open)dialog.showModal();
 }
 function closeLeave(){if(!submittingLeave)dialog.close();}
@@ -486,8 +487,11 @@ dialog.addEventListener('click',event=>{
   if(event.target===dialog&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))closeLeave();
 });
 const start=leaveForm.elements.start_date,end=leaveForm.elements.end_date;
+const leaveDates=window.LeaveDatePicker?.create(leaveForm);
 let assessmentReady=false;
 async function updateEstimate(){
+  leaveDates?.sync();
+  dialog.querySelector('#leaveResult').hidden=true;
   const version=++estimateVersion,output=dialog.querySelector('[data-leave-days]'),context=dialog.querySelector('[data-leave-context]');
   assessmentReady=false;context.replaceChildren();end.min=start.value||'';end.setCustomValidity('');
   if(!start.value||!end.value){output.textContent='Select your dates';leaveButton.disabled=false;return;}
@@ -503,7 +507,9 @@ async function updateEstimate(){
 }
 start.addEventListener('change',()=>{if(start.value&&(!end.value||end.value<start.value))end.value=start.value;updateEstimate();});end.addEventListener('change',updateEstimate);leaveForm.elements.leave_type.addEventListener('change',updateEstimate);updateEstimate();
 leaveForm.addEventListener('submit',async event=>{
-  event.preventDefault();if(submittingLeave||!leaveForm.reportValidity())return;
+  event.preventDefault();if(submittingLeave)return;
+  if(!start.value||!end.value){const error=dialog.querySelector('#leaveResult');error.textContent='Choose your leave dates before sending the request.';error.hidden=false;leaveDates?.focus();return;}
+  if(!leaveForm.reportValidity())return;
   if(!assessmentReady){await updateEstimate();if(!assessmentReady)return;}
   submittingLeave=true;leaveForm.inert=true;leaveButton.disabled=true;
   leaveButton.textContent='Sending request…';

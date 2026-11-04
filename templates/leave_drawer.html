@@ -1,11 +1,17 @@
 <dialog id="leave-drawer" class="leave-drawer" aria-labelledby="leave-drawer-title" aria-describedby="leave-drawer-description">
-  <div class="drawer-heading"><div><p class="drawer-eyebrow">TIME OFF</p><h2 id="leave-drawer-title">Request leave</h2><p id="leave-drawer-description">Plan a break without leaving your workspace.</p></div><button type="button" data-close-leave class="drawer-close" aria-label="Close leave request">×</button></div>
+  <div class="drawer-heading"><div><p class="drawer-eyebrow">TIME OFF</p><h2 id="leave-drawer-title">Request leave</h2><p id="leave-drawer-description">Choose your dates and send them to your team for approval.</p></div><button type="button" data-close-leave class="drawer-close" aria-label="Close leave request">×</button></div>
   <form id="leaveForm" action="/leave/submit" method="post">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <div class="drawer-body">
       <div class="drawer-person"><span class="person-avatar" aria-hidden="true">{{ (user.full_name if user else '?')[:1] }}</span><div><strong data-request-person>{{ user.full_name if user else 'Select an employee' }}</strong><small>Requesting time off</small></div></div>
       <div class="drawer-field"><label for="leave_type">Leave type</label><select id="leave_type" name="leave_type"><option value="Vacation">Annual leave</option><option value="Unpaid">Unpaid leave</option><option value="Other">Other</option></select></div>
-      <div class="drawer-dates"><div class="drawer-field"><label for="start_date">Start date</label><input type="date" id="start_date" name="start_date" required></div><div class="drawer-field"><label for="end_date">End date</label><input type="date" id="end_date" name="end_date" required></div></div>
+      <fieldset class="leave-period">
+        <legend>Leave dates</legend>
+        <div class="drawer-dates" data-leave-native-dates><div class="drawer-field"><label for="start_date">First day</label><input type="date" id="start_date" name="start_date" required></div><div class="drawer-field"><label for="end_date">Last day</label><input type="date" id="end_date" name="end_date" required></div></div>
+        <div class="leave-date-summary" data-leave-date-summary hidden><div><span>First day</span><strong data-leave-first>Choose a date</strong></div><span class="leave-range-arrow" aria-hidden="true">→</span><div><span>Last day</span><strong data-leave-last>Choose a date</strong></div></div>
+        <div class="leave-range-calendar" data-leave-calendar tabindex="-1" aria-label="Choose leave dates" aria-describedby="leave-range-hint" hidden><input type="text" data-leave-range hidden tabindex="-1" aria-hidden="true"></div>
+        <div class="leave-calendar-help" data-leave-calendar-help hidden><p id="leave-range-hint" data-leave-range-hint>Choose your first day.</p><button type="button" data-clear-leave-dates>Clear dates</button></div>
+      </fieldset>
       <div class="leave-estimate" aria-live="polite"><span class="estimate-icon" aria-hidden="true">↗</span><div><strong data-leave-days>Select your dates</strong><small>Weekends and Moldovan public holidays are excluded.</small></div></div>
       <section class="leave-context" data-leave-context aria-live="polite"></section>
       <div class="drawer-field"><label for="comment">Note <span>optional</span></label><textarea id="comment" name="comment" maxlength="1000" rows="4" placeholder="Anything your team should know?"></textarea></div>

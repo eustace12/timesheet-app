@@ -22,7 +22,8 @@ function setup({realTimesheet=false,approvedVacation='',approvedAbsences=[],save
   const insert=d.head.insertBefore.bind(d.head);
   d.head.insertBefore=(node,before)=>{const result=insert(node,before);if(node.tagName==='LINK')setTimeout(()=>node.dispatchEvent(new w.Event('load')),0);return result;};
   w.WorkspacePDF={open:async(buffer,container)=>({pageCount:1,async render(){container.replaceChildren(d.createElement('canvas'));},destroy(){container.replaceChildren();}})};
-  if(realTimesheet){w.eval(readFileSync(resolve(root,'static/vendor/flatpickr/flatpickr.min.js'),'utf8'));w.eval(readFileSync(resolve(root,'static/timesheet-view.js'),'utf8'));}
+  w.eval(readFileSync(resolve(root,'static/vendor/flatpickr/flatpickr.min.js'),'utf8'));
+  if(realTimesheet){w.eval(readFileSync(resolve(root,'static/timesheet-view.js'),'utf8'));}
   else w.PeopleViews={timesheet:()=>({activate(){},pause(){},destroy(){}})};
   w.fetch=async(value,options={})=>{
     const url=new URL(String(value),origin),path=url.pathname;calls.push({path,options});
@@ -53,7 +54,7 @@ function setup({realTimesheet=false,approvedVacation='',approvedAbsences=[],save
     const response=new Response(html,{headers:{'content-type':'text/html'}});
     Object.defineProperty(response,'url',{value:origin+(['/profile','/demo/role'].includes(path)?options.body.get('next'):/\/review$/.test(path)?'/admin':url.pathname+url.search)});return response;
   };
-  for(const file of ['workspace-core.js','workspace-drafts.js','people-experience.js','office-view.js','workspace.js'])w.eval(readFileSync(resolve(root,'static',file),'utf8'));
+  for(const file of ['workspace-core.js','workspace-drafts.js','people-experience.js','office-view.js','leave-date-picker.js','workspace.js'])w.eval(readFileSync(resolve(root,'static',file),'utf8'));
   return {w,d,calls,errors,fail(path){failRoute=path;},rejectReview(message){reviewError=message;},
     expire(path){expiredPath=path;},
     hold(path){heldPath=path;heldRequest=new Promise(resolve=>{releaseRequest=resolve;});},
@@ -435,5 +436,48 @@ test('expired account navigation captures drafts before opening sign-in',async()
     const drafts=Array.from({length:w.sessionStorage.length},(_,n)=>w.sessionStorage.getItem(w.sessionStorage.key(n))).join(' ');
     assert.match(drafts,/Keep this leave note/);assert.doesNotMatch(drafts,/_csrf_token/);
     assert.ok(app.errors.every(message=>/navigation/i.test(message)),'Only jsdom’s native navigation limitation is expected');
+  }finally{app.close();}
+});
+
+test('leave calendar selects one day or a range, clears dates, and restores the employee draft',async()=>{
+  const app=setup();try{
+    const {w,d}=app,start=d.querySelector('#start_date'),end=d.querySelector('#end_date');
+    d.querySelector('[data-request-leave]').click();
+    assert.ok(d.querySelector('[data-leave-calendar] .flatpickr-calendar'),'A calendar must be visible inside the leave drawer');
+    start.value='2026-11-02';end.value='2026-11-02';start.dispatchEvent(new w.Event('change',{bubbles:true}));
+    const day=label=>d.querySelector('[data-leave-calendar] .flatpickr-day[aria-label="'+label+'"]');
+    day('November 10, 2026').click();assert.equal(start.value,'2026-11-10');assert.equal(end.value,'2026-11-10');
+    day('November 19, 2026').click();assert.equal(start.value,'2026-11-10');assert.equal(end.value,'2026-11-19');
+    assert.match(d.querySelector('[data-leave-date-summary]').textContent,/10 Nov 2026/);
+    assert.match(d.querySelector('[data-leave-date-summary]').textContent,/19 Nov 2026/);
+    d.querySelector('[data-close-leave]').click();d.querySelector('[data-request-leave]').click();
+    assert.equal(start.value,'2026-11-10');assert.equal(end.value,'2026-11-19');
+    const stored=Array.from({length:w.sessionStorage.length},(_,n)=>w.sessionStorage.getItem(w.sessionStorage.key(n))).join(' ');
+    assert.match(stored,/2026-11-19/);
+    d.querySelector('[data-clear-leave-dates]').click();assert.equal(start.value,'');assert.equal(end.value,'');
+    await until(()=>!d.querySelector('#leaveSubmit').disabled);
+    d.querySelector('#leaveForm').requestSubmit();await new Promise(resolve=>setTimeout(resolve,5));
+    assert.equal(app.calls.some(call=>call.path==='/leave/submit'),false);
+    assert.match(d.querySelector('#leaveResult').textContent,/Choose/);
+    day('November 20, 2026').click();assert.equal(d.querySelector('#leaveResult').hidden,true);
+    assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
+});
+
+test('leave range can cross a year boundary and stays ISO-formatted for submission',async()=>{
+  const app=setup();try{
+    const {w,d}=app,start=d.querySelector('#start_date'),end=d.querySelector('#end_date');
+    start.value='2026-12-01';end.value='2026-12-01';start.dispatchEvent(new w.Event('change',{bubbles:true}));
+    const day=label=>d.querySelector('[data-leave-calendar] [aria-label="'+label+'"]');
+    day('December 30, 2026').click();
+    d.querySelector('[data-leave-calendar] [aria-label="Next month"]').click();
+    day('January 4, 2027').click();
+    assert.equal(start.value,'2026-12-30');assert.equal(end.value,'2027-01-04');
+    assert.equal(day('January 4, 2027').getAttribute('aria-pressed'),'true');
+    assert.equal(day('January 4, 2027').getAttribute('role'),'button');
+    await until(()=>!d.querySelector('#leaveSubmit').disabled);
+    d.querySelector('#leaveForm').requestSubmit();await until(()=>app.calls.some(call=>call.path==='/leave/submit'));
+    const sent=app.calls.find(call=>call.path==='/leave/submit').options.body;
+    assert.equal(sent.get('start_date'),'2026-12-30');assert.equal(sent.get('end_date'),'2027-01-04');assert.deepEqual(app.errors,[]);
   }finally{app.close();}
 });
