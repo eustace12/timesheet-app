@@ -1160,7 +1160,13 @@
 
             </section><section class="timesheet-absences">
             <section class="month-overview" aria-labelledby="month-overview-title"><div class="panel-heading"><h2 id="month-overview-title">Your month</h2><span class="subtle" data-month-overview-period></span></div><div id="monthOverview" class="month-grid" role="list" aria-label="Monthly work schedule"></div><div class="month-legend"><span><i class="work"></i>Work</span><span><i class="leave"></i>Leave</span><span><i class="sick"></i>Sick</span><span><i class="holiday"></i>Holiday</span><span><i class="weekend"></i>Weekend</span></div></section>
-            <details class="absence-editor"><summary>Add or update absences <span>Optional</span></summary><p class="absence-guidance">Dates entered here affect this timesheet. Use <button type="button" class="text-button" data-request-leave>Request leave</button> to manage approval and your leave balance. Approved leave dates are included automatically.</p>
+            <details class="absence-editor">
+                <summary>
+                    <span class="absence-editor-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18M9 16h6"/></svg></span>
+                    <span class="absence-editor-copy"><strong>Days off this month</strong><span>Add vacation, sick leave or other days you didn't work.</span></span>
+                    <span class="absence-editor-action" aria-hidden="true"><span class="absence-action-open">Add / edit days</span><span class="absence-action-close">Hide details</span><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 8 4 4 4-4"/></svg></span>
+                </summary>
+                <p class="absence-guidance">Approved leave is already included. Need approval for new time off? <button type="button" class="text-button" data-request-leave>Request leave</button></p>
             <!-- Absences -->
             <div class="section-head">
                 {{ t('timesheet.absences') }}
