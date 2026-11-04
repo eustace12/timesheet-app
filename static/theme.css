@@ -99,3 +99,6 @@ html[data-theme=dark] .account-page input:-webkit-autofill{box-shadow:0 0 0 1000
 html[data-theme=dark] .people-app input:-webkit-autofill{box-shadow:0 0 0 1000px var(--theme-raised) inset!important;-webkit-text-fill-color:var(--theme-ink)!important;caret-color:var(--theme-ink)!important}
 html[data-theme=dark] .people-app tbody tr{background:var(--theme-surface)!important;border-color:var(--theme-border)!important}
 html[data-theme=dark] .people-app .responsive-records td::before{color:var(--theme-muted)!important}
+html[data-theme=dark] .people-app .document-preview>header{background:var(--theme-surface)!important;border-color:var(--theme-border)!important}
+html[data-theme=dark] .people-app .optional{color:var(--theme-muted)!important}
+html[data-theme=dark] .people-app .flatpickr-day.selected.today{background:#156eaa!important;color:#fff!important}
