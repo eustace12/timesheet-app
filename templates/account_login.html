@@ -3,26 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f8fc">
   <title>Sign in · Urchin People</title>
   <link rel="icon" href="/static/favicon.ico">
-  <style>
-    *{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;background:#f4f8fc;color:#173950;font:16px/1.55 system-ui,sans-serif;padding:24px}main{width:100%;max-width:440px;background:#fff;border:1px solid #e1eaf2;border-radius:20px;padding:36px;box-shadow:0 16px 50px #15355009}.brand{width:155px;height:auto;display:block;margin-bottom:30px}h1{font-size:28px;line-height:1.25;margin:0 0 10px}p{color:#587083;margin:0 0 26px}label{display:block;font-size:14px;font-weight:600;margin:18px 0 7px}input{width:100%;font:inherit;padding:12px;border:1px solid #bed0de;border-radius:9px;color:inherit}input:focus{outline:3px solid #90d6f66b;border-color:#087db6}button{width:100%;margin-top:26px;padding:13px;background:#087db6;color:#fff;border:0;border-radius:9px;font:600 16px system-ui;cursor:pointer}button:focus-visible{outline:3px solid #66c8ef;outline-offset:3px}.error{padding:12px 14px;background:#fff1ee;border:1px solid #efc6bc;border-radius:9px;color:#8d3928;font-size:14px;margin-bottom:18px}.support{font-size:13px;margin:22px 0 0;color:#637b8d}@media(max-width:480px){body{padding:16px}main{padding:26px}}
-  </style>
+  {% include 'brand_head.html' %}
+  <link rel="stylesheet" href="/static/account-login.css">
+  <script src="/static/account-login.js" defer></script>
 </head>
-<body><main>
-  <img class="brand" src="/static/brand/urchin-systems.png" alt="Urchin Systems" width="1204" height="512">
-  <h1>Sign in to Urchin People</h1>
-  <p>Your monthly timesheet, time off and office plans in one workspace.</p>
-  {% if error %}<div class="error" role="alert" id="login-error">{{ error }}</div>{% endif %}
-  <form action="/login" method="post">
-    <input type="hidden" name="_csrf_token" value="{{ login_csrf }}">
-    <input type="hidden" name="next" value="{{ next_url }}">
-    <label for="account-email">Account email</label>
-    <input id="account-email" name="email" type="email" autocomplete="username" value="{{ email }}" required maxlength="254" autofocus {% if error %}aria-describedby="login-error"{% endif %}>
-    <label for="account-password">Password</label>
-    <input id="account-password" name="password" type="password" autocomplete="current-password" required maxlength="4096" {% if error %}aria-describedby="login-error"{% endif %}>
-    <button type="submit">Sign in</button>
-  </form>
-  <p class="support">Use your company-issued account. For access or password help, contact your administrator.</p>
-</main></body>
+<body class="account-page">
+  <div class="login-layout">
+    <header class="login-header"><a href="/login" aria-label="Urchin People sign in"><img class="login-brand" src="/static/brand/urchin-systems.png" alt="Urchin Systems" width="1204" height="512"></a>{% include 'theme_toggle.html' %}</header>
+    <main class="login-card">
+      <span class="login-eyebrow">URCHIN PEOPLE</span>
+      <h1>Welcome back</h1>
+      <p class="login-intro">Sign in to manage your timesheets, time off and office plans.</p>
+      {% if error %}<div class="login-error" role="alert" id="login-error">{{ error }}</div>{% endif %}
+      <form action="/login" method="post" data-account-login>
+        <input type="hidden" name="_csrf_token" value="{{ login_csrf }}">
+        <input type="hidden" name="next" value="{{ next_url }}">
+        <label for="account-email">Email</label>
+        <input id="account-email" name="email" type="email" autocomplete="username" value="{{ email }}" required maxlength="254" autofocus {% if error %}aria-describedby="login-error"{% endif %}>
+        <label for="account-password">Password</label>
+        <div class="login-password"><input id="account-password" name="password" type="password" autocomplete="current-password" required maxlength="4096" {% if error %}aria-describedby="login-error"{% endif %}><button type="button" data-password-toggle aria-controls="account-password" aria-label="Show password" aria-pressed="false">Show</button></div>
+        <button type="submit" class="login-submit">Sign in <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="login-support">Need an account or help with your password?<br>Contact your administrator.</p>
+    </main>
+    <footer class="login-footer">Urchin Systems <span aria-hidden="true">·</span> People</footer>
+  </div>
+</body>
 </html>

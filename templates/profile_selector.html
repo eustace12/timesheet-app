@@ -1,5 +1,5 @@
 {% if is_production %}
-<div class="profile-selector company-identity" data-person="{{ user.id if user else 'none' }}" data-person-name="{{ user.full_name if user else '' }}"><span>{{ user.full_name if user else 'Company account' }}<small>{{ 'Accountant' if is_accountant else 'Employee' }}</small></span></div>
+<div class="profile-selector company-identity" data-person="{{ user.id if user else 'none' }}" data-person-name="{{ user.full_name if user else '' }}"><span>{{ user.full_name if user else 'Company account' }}<small>{{ 'Accountant' if is_accountant else 'Employee' }}{% if is_accountant %} · <a class="account-workspace-link" href="/">My workspace</a>{% endif %}</small></span></div>
 {% else %}
 <form method="post" action="/profile" class="profile-selector">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
