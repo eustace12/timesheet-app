@@ -102,3 +102,4 @@ html[data-theme=dark] .people-app .responsive-records td::before{color:var(--the
 html[data-theme=dark] .people-app .document-preview>header{background:var(--theme-surface)!important;border-color:var(--theme-border)!important}
 html[data-theme=dark] .people-app .optional{color:var(--theme-muted)!important}
 html[data-theme=dark] .people-app .flatpickr-day.selected.today{background:#156eaa!important;color:#fff!important}
+html[data-theme=dark] .people-app .presence-label{color:var(--theme-muted)!important}
