@@ -103,3 +103,4 @@ html[data-theme=dark] .people-app .document-preview>header{background:var(--them
 html[data-theme=dark] .people-app .optional{color:var(--theme-muted)!important}
 html[data-theme=dark] .people-app .flatpickr-day.selected.today{background:#156eaa!important;color:#fff!important}
 html[data-theme=dark] .people-app .presence-label{color:var(--theme-muted)!important}
+html[data-theme=dark] .people-app .record-filter button>span{background:#25435d!important;color:#b5dfff!important}
