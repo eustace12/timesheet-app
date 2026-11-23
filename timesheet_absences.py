@@ -70,8 +70,12 @@ def normalize(user, year, month, vacation, sick, custom, reason):
         raise ValueError('Add a reason for the other absence dates.')
     approved_vacation = {day for day, kind in approved.items() if kind == 'Vacation'}
     approved_other = set(approved) - approved_vacation
-    # The server is authoritative even if a stale or altered client omits dates.
-    vacation_days.update(approved_vacation)
+    if user:
+        # Annual leave enters a profile's timesheet only through an approved request;
+        # the server is authoritative whatever a stale or altered client sends.
+        vacation_days = set(approved_vacation)
+    else:
+        vacation_days.update(approved_vacation)
     if (vacation_days & sick_days or vacation_days & other_days or sick_days & other_days
             or approved_other & (vacation_days | sick_days | other_days)):
         raise ValueError('Absence types overlap. Remove the conflicting dates before submitting.')

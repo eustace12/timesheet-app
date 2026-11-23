@@ -174,6 +174,7 @@ def inject_user():
         'supported_languages': SUPPORTED_LANGUAGES,
         't': lambda key: translate(key, language),
         'csrf_token': csrf_token,
+        'today_period': (company_today().year, company_today().month),
         'people': [] if production_access.is_production() else db.list_users(),
         'is_accountant': (bool(current_user() and current_user()['role'] == 'admin') if production_access.is_production()
                           else session.get('demo_role') == 'accountant'),
@@ -920,6 +921,25 @@ def download_own_leave(leave_id):
     return _send_stored_document(row, 'leave')
 
 
+@app.route('/leave/<int:leave_id>/withdraw', methods=['POST'])
+def withdraw_leave(leave_id):
+    user = current_user()
+    if not user:
+        abort(403)
+    try:
+        row = db.withdraw_leave_request(leave_id, user['id'], request.form.get('expected_submitted_at'),
+                                        actor_user_id=audit_actor())
+    except db.WorkflowConflict as exc:
+        return jsonify({'error': str(exc)}), 409
+    if row is None:
+        abort(404)
+    if row['storage_key']:
+        document_storage.delete(row['storage_key'])
+    elif (path := _stored_file_path('leave', row['filename'])) is not None:
+        path.unlink(missing_ok=True)
+    return redirect('/history' if request.form.get('next') == '/history' else url_for('leave_page'))
+
+
 @app.route('/admin')
 def admin_page():
     now = company_today()
@@ -931,9 +951,15 @@ def admin_page():
     if not 1 <= month <= 12 or not 1 <= year <= 9999:
         return jsonify({'error': 'Choose a valid month and year.'}), 400
 
-    timesheets = db.list_timesheets(year, month)
-    submitted_ids = {row['user_id'] for row in timesheets}
+    period_timesheets = db.list_timesheets(year, month)
+    submitted_ids = {row['user_id'] for row in period_timesheets}
     missing = [emp for emp in db.list_employees() if emp['id'] not in submitted_ids]
+    # Pending documents stay in the queue whichever month is being viewed.
+    timesheets = _merge_documents(period_timesheets, db.list_pending_documents('timesheets'),
+                                  key=lambda row: (row['full_name'], row['year'], row['month']))
+    leave_requests = _merge_documents(db.list_leave_requests_for_month(year, month),
+                                      db.list_pending_documents('leave_requests'),
+                                      key=lambda row: (row['start_date'], row['full_name']))
     return render_template(
         'admin.html',
         user=current_user(),
@@ -941,9 +967,15 @@ def admin_page():
         month=month,
         months=list(calendar.month_name)[1:],
         timesheets=timesheets,
-        leave_requests=db.list_leave_requests_for_month(year, month),
+        leave_requests=leave_requests,
         missing=missing,
     )
+
+
+def _merge_documents(period_rows, pending_rows, key):
+    merged = {row['id']: row for row in pending_rows}
+    merged.update({row['id']: row for row in period_rows})
+    return sorted(merged.values(), key=key)
 
 
 @app.route('/admin/timesheets/<int:ts_id>/review', methods=['POST'])

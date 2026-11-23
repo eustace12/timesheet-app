@@ -419,8 +419,14 @@ async function changeDemoRole(nextRole){
 }
 const deleteDialog=document.querySelector('#delete-person-dialog');
 let pendingDelete;
+const confirmParts={title:'h2',message:'[data-delete-description]',note:'p.subtle',keep:'[data-cancel-delete]',action:'[data-approve-delete]'};
+const confirmDefaults=deleteDialog?Object.fromEntries(Object.entries(confirmParts).map(([name,selector])=>[name,deleteDialog.querySelector(selector).textContent])):{};
 function confirmDelete(form,submitter){
-  pendingDelete={form,submitter};deleteDialog.querySelector('[data-delete-description]').textContent='Remove '+form.dataset.personName+' from the team?';deleteDialog.showModal();
+  pendingDelete={form,submitter};
+  const texts={...confirmDefaults,message:'Remove '+form.dataset.personName+' from the team?'};
+  for(const name of Object.keys(confirmParts)){const custom=form.dataset['confirm'+name[0].toUpperCase()+name.slice(1)];if(custom)texts[name]=custom;}
+  for(const [name,selector] of Object.entries(confirmParts))deleteDialog.querySelector(selector).textContent=texts[name];
+  deleteDialog.showModal();
 }
 deleteDialog?.querySelector('[data-cancel-delete]').addEventListener('click',()=>deleteDialog.close());
 deleteDialog?.querySelector('[data-approve-delete]').addEventListener('click',()=>{

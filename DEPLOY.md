@@ -18,6 +18,7 @@ For a **new company database**, apply:
 4. `supabase/migrations/20261102164908_office_plans.sql`
 5. `supabase/migrations/20261102173305_recorded_hours_snapshot.sql`
 6. `supabase/migrations/20261102173413_account_sessions.sql`
+7. `supabase/migrations/20261123120000_leave_withdrawal.sql` — `withdraw_leave_atomic`, lets employees withdraw a pending leave request (the journal keeps the withdrawal)
 
 The workflow migration adds the typed monthly absence snapshot, atomic workflow RPCs and the immutable activity journal. It is additive and preserves existing records. Apply it before new application code: there is deliberately no fallback to unsafe non-atomic writes. RPC execution and personnel tables are server-side only; public/anonymous roles receive no access.
 

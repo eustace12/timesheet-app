@@ -19,7 +19,7 @@
 <td><time datetime="{{ event.created_at }}">{{ event.created_at|display_date }}<small class="subtle"> · {{ (event.created_at|string)[11:19] }} UTC</small></time></td>
 <td>{{ person_name(event.user_id, 'Employee #' + event.user_id|string) }}</td>
 <td>{% if event.kind == 'timesheets' %}Monthly timesheet #{{ event.document_id }}{% elif event.kind == 'leave_requests' %}Time-off request #{{ event.document_id }}{% elif event.kind == 'entitlement' %}Annual allowance · {{ event.document_id }}{% else %}{{ event.kind }} #{{ event.document_id }}{% endif %}</td>
-<td><strong>{{ {'submitted':'Submitted', 'resubmitted':'Resubmitted', 'reviewed':'Reviewed', 'reopened':'Reopened for changes', 'allowance_updated':'Allowance updated'}.get(event.action,event.action) }}</strong><br>{% if event.status == 'updated' %}<span class="status-badge status-draft">Updated</span>{% else %}{{ status_badge(event.status) }}{% endif %}</td>
+<td><strong>{{ {'submitted':'Submitted', 'resubmitted':'Resubmitted', 'reviewed':'Reviewed', 'reopened':'Reopened for changes', 'withdrawn':'Withdrawn by employee', 'allowance_updated':'Allowance updated'}.get(event.action,event.action) }}</strong><br>{% if event.status == 'updated' %}<span class="status-badge status-draft">Updated</span>{% else %}{{ status_badge(event.status) }}{% endif %}</td>
 <td>{{ person_name(event.actor_user_id, 'Demo / legacy') }}</td>
 <td>{{ event.comment or '—' }}</td>
 </tr>{% endfor %}</tbody></table></div>

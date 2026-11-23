@@ -177,7 +177,8 @@ def test_production_rpc_guards_in_disposable_postgres():
                      'CREATE SCHEMA storage; CREATE TABLE storage.buckets(id text primary key, name text, public boolean);')
             repository = Path(__file__).resolve().parents[1]
             for name in ('supabase/schema.sql', 'supabase/hr_workspace.sql',
-                         'supabase/migrations/20261102160704_workflow_integrity.sql'):
+                         'supabase/migrations/20261102160704_workflow_integrity.sql',
+                         'supabase/migrations/20261123120000_leave_withdrawal.sql'):
                 succeeds((repository / name).read_text())
             succeeds("INSERT INTO users(username,password_hash,full_name,role,created_at) "
                      "VALUES('test','','Fictional Tester','employee','2026-11-02'); "
@@ -207,6 +208,17 @@ def test_production_rpc_guards_in_disposable_postgres():
             result = sql("SET ROLE anon;SELECT submit_timesheet_atomic('{}');")
             assert result.returncode != 0 and 'permission denied' in result.stderr
             assert succeeds('SET ROLE service_role;SELECT count(*) FROM workflow_events;').strip().endswith('6')
+            conflicts("SET ROLE service_role;SELECT withdraw_leave_atomic(1,1,'now');")
+            later = dict(request, start_date='2026-11-16', end_date='2026-11-17')
+            succeeds("SET ROLE service_role;SELECT submit_leave_atomic('" + json.dumps(later) + "'::jsonb,'[]');")
+            assert succeeds("SET ROLE service_role;SELECT withdraw_leave_atomic(2,99,'now') IS NULL;").strip().endswith('t')
+            succeeds("SET ROLE service_role;SELECT withdraw_leave_atomic(2,1,'now');")
+            assert succeeds('SET ROLE service_role;SELECT count(*) FROM leave_requests WHERE id = 2;').strip().endswith('0')
+            assert succeeds("SET ROLE service_role;SELECT action FROM workflow_events ORDER BY id DESC LIMIT 1;").strip().endswith('withdrawn')
+            assert succeeds("SET ROLE service_role;SELECT review_document_atomic('leave_requests',2,'accepted','','now') IS NULL;").strip().endswith('t')
+            assert succeeds("SET ROLE service_role;SELECT action FROM workflow_events ORDER BY id DESC LIMIT 1;").strip().endswith('withdrawn')
+            result = sql("SET ROLE anon;SELECT withdraw_leave_atomic(1,1,'now');")
+            assert result.returncode != 0 and 'permission denied' in result.stderr
             for statement in ("UPDATE workflow_events SET comment = 'changed'", 'DELETE FROM workflow_events', 'TRUNCATE workflow_events'):
                 result = sql('SET ROLE service_role;' + statement)
                 assert result.returncode != 0 and 'immutable' in result.stderr

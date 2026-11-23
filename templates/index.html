@@ -1081,31 +1081,18 @@
             <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
 
             <div class="timesheet-layout"><section class="timesheet-details">
-            <!-- Period -->
-            <div class="section-head">{{ t('common.period') }}</div>
-            <div class="field-row">
-                <div class="field">
-                    <label for="year">{{ t('common.year') }}</label>
-                    <input type="number" id="year" name="year" value="{{ current_year }}" min="2020" max="2099" required>
-                </div>
-                <div class="field">
-                    <label for="month">{{ t('common.month') }}</label>
-                    <select id="month" name="month" required>
-                        {% for i in range(1, 13) %}
-                        <option value="{{ i }}" {% if i == current_month %}selected{% endif %}>
-                            {{ months[i-1] }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
+            <input type="hidden" id="year" name="year" value="{{ current_year }}">
+            <input type="hidden" id="month" name="month" value="{{ current_month }}">
 
             <!-- Employee -->
-            <div class="section-head employee-details-heading" style="margin-top:24px;">Employee details</div>
+            <div class="section-head employee-details-heading">Employee details</div>
             <div class="field-row single employee-details-field">
                 <div class="field">
-                    <label for="employee_name">{{ t('common.full_name') }}</label>
-                    <input type="text" id="employee_name" name="employee_name" value="{{ user.full_name if user else '' }}" placeholder="{{ t('common.employee') }}" required {% if user %}readonly{% endif %}>
+                    {% if user %}<span class="field-label">{{ t('common.full_name') }}</span>
+                    <p class="profile-value" id="employee_name_display">{{ user.full_name }}</p>
+                    <input type="hidden" id="employee_name" name="employee_name" value="{{ user.full_name }}">
+                    {% else %}<label for="employee_name">{{ t('common.full_name') }}</label>
+                    <input type="text" id="employee_name" name="employee_name" value="" placeholder="{{ t('common.employee') }}" required>{% endif %}
                 </div>
             </div>
 
@@ -1159,7 +1146,7 @@
             </div>
 
             </section><section class="timesheet-absences">
-            <section class="month-overview" aria-labelledby="month-overview-title"><div class="panel-heading"><h2 id="month-overview-title">Your month</h2><span class="subtle" data-month-overview-period></span></div><div id="monthOverview" class="month-grid" role="list" aria-label="Monthly work schedule"></div><div class="month-legend"><span><i class="work"></i>Work</span><span><i class="leave"></i>Leave</span><span><i class="sick"></i>Sick</span><span><i class="holiday"></i>Holiday</span><span><i class="weekend"></i>Weekend</span></div></section>
+            <section class="month-overview" aria-labelledby="month-overview-title"><div class="panel-heading"><h2 id="month-overview-title">Your month</h2><div class="month-stepper" role="group" aria-label="Timesheet month"><button type="button" class="stepper-button" data-step="-1" aria-label="Previous month">‹</button><span class="stepper-label" data-month-overview-period aria-live="polite"></span><button type="button" class="stepper-button" data-step="1" aria-label="Next month">›</button><button type="button" class="text-button stepper-today" data-step="today" hidden>This month</button></div></div><div id="monthOverview" class="month-grid" role="list" aria-label="Monthly work schedule"></div><div class="month-legend"><span><i class="work"></i>Work</span><span><i class="leave"></i>Leave</span><span><i class="sick"></i>Sick</span><span><i class="holiday"></i>Holiday</span><span><i class="weekend"></i>Weekend</span></div><p class="month-hint subtle">Select a working day to mark it as sick or another absence.</p></section>
             <details class="absence-editor">
                 <summary>
                     <span class="absence-editor-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18M9 16h6"/></svg></span>
@@ -1175,26 +1162,18 @@
 
             <div class="absence-stack">
 
-                <!-- Vacation -->
-                <div class="absence-card vacation">
+                <!-- Approved leave: read-only, it comes from approved time-off requests -->
+                <div class="absence-card vacation approved-leave-card">
                     <div class="absence-head">
                         <div class="absence-label">
-                            <span class="type-dot vacation"></span> {{ t('timesheet.vacation') }}
+                            <span class="type-dot vacation"></span> Approved leave
                         </div>
-                        <button type="button" class="btn-clear" onclick="clearVacation()" aria-label="{{ t('timesheet.clear_vacation') }}">{{ t('common.clear') }}</button>
+                        <button type="button" class="text-button" data-request-leave>Request leave</button>
                     </div>
                     <div class="absence-body">
                         <input type="hidden" id="vacation" name="vacation" value="{{ approved_vacation }}" data-value="{{ approved_vacation }}">
-                        {% if approved_vacation %}
-                        <p class="hint info" style="display:block; margin:0 0 10px;">{{ t('timesheet.approved_leave_prefilled') }}</p>
-                        {% endif %}
-                        <div class="quick-actions">
-                            <button type="button" class="qbtn" onclick="addQuickVacation(5)">+ {{ t('timesheet.one_week') }}</button>
-                            <button type="button" class="qbtn" onclick="addQuickVacation(10)">+ {{ t('timesheet.two_weeks') }}</button>
-                            <button type="button" class="qbtn" onclick="addQuickVacation(15)">+ {{ t('timesheet.three_weeks') }}</button>
-                            <button type="button" class="qbtn pick" onclick="openCalendar('vacation')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> {{ t('timesheet.add_period') }}</button>
-                        </div>
                         <div class="selected-dates" id="vacationDisplay"></div>
+                        <p class="approved-leave-empty subtle">No approved leave this month. Annual leave appears here once accounting approves your request.</p>
                     </div>
                 </div>
 
@@ -1283,7 +1262,6 @@
 <div id="calBackdrop" class="cal-backdrop" onclick="closeCalendar()"></div>
 
 <!-- Hidden inputs for range period pickers (not submitted) -->
-<input type="text" id="vacationPickerInput" style="display:none;" readonly>
 <input type="text" id="sickPickerInput" style="display:none;" readonly>
 
 

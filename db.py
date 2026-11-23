@@ -729,6 +729,23 @@ def list_timesheets(year: int, month: int) -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def list_pending_documents(table: str) -> list:
+    """Every document awaiting review, whatever period it covers."""
+    if table not in {'timesheets', 'leave_requests'}:
+        raise ValueError('Unknown document kind.')
+    if _using_supabase():
+        rows = _remote_rows(_client().table(table).select('*').eq('status', 'submitted').execute())
+        return _with_user_details(rows)
+    with connect() as conn:
+        return conn.execute(
+            f"""
+            SELECT d.*, u.full_name, u.username
+            FROM {table} d JOIN users u ON u.id = d.user_id
+            WHERE d.status = 'submitted'
+            """
+        ).fetchall()
+
+
 def list_user_timesheets(user_id: int) -> list[sqlite3.Row]:
     if _using_supabase():
         return _remote_rows(
@@ -793,6 +810,25 @@ def get_leave_request(leave_id: int) -> sqlite3.Row | None:
 
 def review_leave_request(leave_id: int, status: str, review_comment: str, expected_submitted_at=None, actor_user_id=None):
     return _review_document('leave_requests', leave_id, status, review_comment, expected_submitted_at, actor_user_id=actor_user_id)
+
+
+def withdraw_leave_request(leave_id: int, user_id: int, expected_submitted_at=None, actor_user_id=None):
+    """Remove the employee's own pending request; returns the withdrawn row or None."""
+    if _using_supabase():
+        return _workflow_rpc('withdraw_leave_atomic', {
+            'p_id': leave_id, 'p_user_id': user_id, 'p_at': _now(),
+            'p_expected_submitted_at': expected_submitted_at, 'p_actor_user_id': actor_user_id,
+        })
+    with connect() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        row = conn.execute('SELECT * FROM leave_requests WHERE id = ?', (leave_id,)).fetchone()
+        if row is None or row['user_id'] != user_id:
+            return None
+        if row['status'] != 'submitted' or (expected_submitted_at is not None and row['submitted_at'] != expected_submitted_at):
+            raise WorkflowConflict('This request was already reviewed. Refresh to see the decision.')
+        conn.execute('DELETE FROM leave_requests WHERE id = ?', (leave_id,))
+        record_workflow_event(conn, 'leave_requests', leave_id, user_id, 'withdrawn', 'withdrawn', actor_user_id=actor_user_id)
+        return row
 
 
 def list_leave_requests(limit: int = 100) -> list[sqlite3.Row]:

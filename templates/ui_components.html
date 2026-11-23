@@ -1,5 +1,5 @@
 {% macro status_badge(status) -%}
-<span class="status-badge status-{{ status }}">{{ {'accepted':'Approved','needs_changes':'Changes requested','submitted':'Awaiting review','draft':'Draft'}.get(status,status) }}</span>
+<span class="status-badge status-{{ status }}">{{ {'accepted':'Approved','needs_changes':'Changes requested','submitted':'Awaiting review','draft':'Draft','withdrawn':'Withdrawn'}.get(status,status) }}</span>
 {%- endmacro %}
 {% macro review_form(kind, row, year, month) -%}
 {% if row.status == 'submitted' or (row.status == 'accepted' and kind == 'timesheets') %}
@@ -14,4 +14,20 @@
 </form></details>
 {% elif row.status == 'needs_changes' %}<p class="subtle">Waiting for the employee to send a revised request.</p>
 {% else %}<p class="subtle">This request has been approved and saved.</p>{% endif %}
+{%- endmacro %}
+
+{% macro withdraw_leave_form(row, next) -%}
+{% if row.status == 'submitted' %}<form method="post" action="/leave/{{ row.id }}/withdraw" class="withdraw-form" data-confirm-delete data-confirm-title="Withdraw this request?" data-confirm-message="{{ 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}, {{ row.start_date|display_date }} – {{ row.end_date|display_date }}." data-confirm-note="Accounting will no longer see it. You can send a new request at any time." data-confirm-keep="Keep request" data-confirm-action="Withdraw"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="expected_submitted_at" value="{{ row.submitted_at }}"><input type="hidden" name="next" value="{{ next }}"><button type="submit" class="text-button danger">Withdraw</button></form>{% endif %}
+{%- endmacro %}
+
+{% macro period_stepper(path, year, month=none, extra='') -%}
+{% set names = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+{% if month %}{% set prev = (year, month - 1) if month > 1 else (year - 1, 12) %}{% set nxt = (year, month + 1) if month < 12 else (year + 1, 1) %}{% set current = today_period %}{% set unit = 'month' %}{% set label = names[month - 1] ~ ' ' ~ year %}
+{% else %}{% set prev = (year - 1, none) %}{% set nxt = (year + 1, none) %}{% set current = (today_period[0], none) %}{% set unit = 'year' %}{% set label = year %}{% endif %}
+<nav class="month-stepper period-stepper" aria-label="Choose {{ unit }}">
+{% if prev[0] >= 2020 %}<a class="stepper-button" href="{{ path }}?year={{ prev[0] }}{% if prev[1] %}&amp;month={{ prev[1] }}{% endif %}{{ extra }}" aria-label="Previous {{ unit }}">‹</a>{% else %}<span class="stepper-button" aria-hidden="true">‹</span>{% endif %}
+<span class="stepper-label" aria-current="page">{{ label }}</span>
+{% if nxt[0] <= 2099 %}<a class="stepper-button" href="{{ path }}?year={{ nxt[0] }}{% if nxt[1] %}&amp;month={{ nxt[1] }}{% endif %}{{ extra }}" aria-label="Next {{ unit }}">›</a>{% else %}<span class="stepper-button" aria-hidden="true">›</span>{% endif %}
+{% if (year, month) != current %}<a class="text-button stepper-today" href="{{ path }}?year={{ current[0] }}{% if month %}&amp;month={{ current[1] }}{% endif %}{{ extra }}">This {{ unit }}</a>{% endif %}
+</nav>
 {%- endmacro %}

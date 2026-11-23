@@ -12,7 +12,7 @@ const LAST_PERIOD_KEY = 'timesheetLastPeriodV3:'+person;
 let periodCursor=null,periodInfo=null,periodRevision=0,initialized=false;
 let viewActive=false,backgroundTimer=null,backgroundRequest=null;
 const isPeriodLocked=()=>Boolean(periodInfo?.timesheet&&['submitted','accepted'].includes(periodInfo.timesheet.status));
-let activeCalType    = null;  // 'vacation' | 'sick' | 'custom'
+let activeCalType    = null;  // 'sick' | 'custom'
 let suppressCalClose = false; // skip onCalClose during programmatic clear()
 let vacationPeriods  = [];    // [{start: Number, end: Number}]
 let sickPeriods      = [];
@@ -121,11 +121,9 @@ function periodDraft(target){
 function saveFormState(target=periodCursor||getYM(),force=false){
   if(!force&&root.dataset.viewReady==='loading')return;
   try{
-    // Approved days belong to the server, rather than to the employee's draft.
-    const approved=new Set(parseDaySet(periodInfo?.approved_vacation||''));
-    const manualVacation=Array.from(parseDaySet(byId('vacation').getAttribute('data-value')||'')).filter(day=>!approved.has(day));
+    // Annual leave belongs to approved requests on the server, never to the draft.
     const state={year:target.year,month:target.month,custom_reason:byId('custom_reason').value,
-      format:getSelectedFormat(),vacation:daysToRanges(manualVacation),
+      format:getSelectedFormat(),
       sick:byId('sick').getAttribute('data-value')||'',custom_days:byId('custom_days').getAttribute('data-value')||''};
     localStorage.setItem(WorkspaceCore.periodDraftKey(person,target.year,target.month),JSON.stringify(state));
     localStorage.setItem(LAST_PERIOD_KEY,JSON.stringify({year:target.year,month:target.month}));
@@ -134,8 +132,7 @@ function saveFormState(target=periodCursor||getYM(),force=false){
 function applyPeriodValues(target){
   const saved=periodInfo?.timesheet;
   const state=(isPeriodLocked()?saved:periodDraft(target)||saved)||{};
-  const days=new Set([...parseDaySet(state.vacation||''),...parseDaySet(isPeriodLocked()?'':periodInfo?.approved_vacation||'')]);
-  vacationPeriods=periodsFromString(daysToRanges(Array.from(days)));
+  vacationPeriods=periodsFromString(isPeriodLocked()?state.vacation||'':approvedVacationRanges());
   sickPeriods=periodsFromString(state.sick||'');
   syncPeriodInput('vacation');syncPeriodInput('sick');
   setDateInput('custom_days',state.custom_days||'');
@@ -152,8 +149,8 @@ function renderPeriodStatus(){
   byId('submitBtn').disabled=locked||Boolean(periodInfo?.unavailable)||person==='none';
   byId('submitBtn').textContent=locked?(sheet.status==='accepted'?'Approved':'Awaiting review'):UI.submitLabel;
   byId('submitBtn').setAttribute('aria-label',byId('submitBtn').textContent);
-  root.querySelectorAll('.timesheet-absences button').forEach(button=>{button.disabled=locked;});
-  byId('custom_reason').readOnly=locked;syncVacationControls();
+  root.querySelectorAll('.timesheet-absences button:not([data-step]):not([data-request-leave])').forEach(button=>{button.disabled=locked;});
+  byId('custom_reason').readOnly=locked;
   root.querySelectorAll('input[name=format]').forEach(input=>{input.disabled=locked;});
   byId('previewBtn').disabled=Boolean(periodInfo?.unavailable)||(locked&&sheet.format!=='pdf');
   byId('generateBtn').disabled=Boolean(periodInfo?.unavailable);
@@ -177,7 +174,7 @@ async function getPeriodInfo(target){
   }catch{return {unavailable:true,timesheet:null,approved_vacation:''};}
 }
 async function refreshPeriod({background=false}={}){
-  const target=getYM(),version=++periodRevision,previousApproved=parseDaySet(periodInfo?.approved_vacation||'');
+  const target=getYM(),version=++periodRevision;
   const info=await getPeriodInfo(target);
   if(disposed||version!==periodRevision)return;
   if(background&&(!viewActive||document.hidden||documentPending||root.dataset.viewReady==='loading'))return;
@@ -186,9 +183,7 @@ async function refreshPeriod({background=false}={}){
   if(isPeriodLocked()){
     applyPeriodValues(target);await updateStats();
   }else{
-    const manual=Array.from(parseDaySet(byId('vacation').getAttribute('data-value')||'')).filter(day=>!previousApproved.has(day));
-    const merged=new Set([...manual,...parseDaySet(info.approved_vacation||'')]);
-    vacationPeriods=periodsFromString(daysToRanges(Array.from(merged)));syncPeriodInput('vacation');renderPeriodBadges('vacation');await updateStats();
+    vacationPeriods=periodsFromString(approvedVacationRanges());syncPeriodInput('vacation');renderPeriodBadges('vacation');await updateStats();
   }
   renderPeriodStatus();
 }
@@ -237,9 +232,7 @@ function openCalendar(type) {
         return;
     }
     activeCalType = type;
-    if (type === 'vacation') {
-        openPeriodPicker(pickers.vacationPicker);
-    } else if (type === 'sick') {
+    if (type === 'sick') {
         openPeriodPicker(pickers.sickPicker);
     } else if (type === 'custom') {
         pickers.customPicker.open();
@@ -249,7 +242,6 @@ function openCalendar(type) {
 function closeCalendar() {
     byId('calBackdrop').classList.remove('active');
     if (pickers) {
-        if (pickers.vacationPicker.isOpen) pickers.vacationPicker.close();
         if (pickers.sickPicker.isOpen)     pickers.sickPicker.close();
         if (pickers.customPicker.isOpen)   pickers.customPicker.close();
     }
@@ -348,15 +340,9 @@ function makePeriodOnChange(type) {
         if (dates.length !== 2) return;
         const start = dates[0].getDate();
         const end   = dates[1].getDate();
-        if (type === 'vacation') {
-            vacationPeriods.push({ start, end });
-            renderPeriodBadges('vacation');
-            syncPeriodInput('vacation');
-        } else {
-            sickPeriods.push({ start, end });
-            renderPeriodBadges('sick');
-            syncPeriodInput('sick');
-        }
+        sickPeriods.push({ start, end });
+        renderPeriodBadges('sick');
+        syncPeriodInput('sick');
         setTimeout(() => {
             suppressCalClose = true;
             instance.clear(false);
@@ -391,11 +377,6 @@ function initCalendars() {
         onReady: makeOnReady(false),
     };
 
-    const vacationPicker = flatpickr(byId('vacationPickerInput'), {
-        ...rangeBase,
-        onChange: makePeriodOnChange('vacation'),
-    });
-
     const sickPicker = flatpickr(byId('sickPickerInput'), {
         ...rangeBase,
         onChange: makePeriodOnChange('sick'),
@@ -413,7 +394,7 @@ function initCalendars() {
         onReady: makeOnReady(true),
     });
 
-    return { vacationPicker, sickPicker, customPicker };
+    return { sickPicker, customPicker };
 }
 
 /* ── Period badge rendering ── */
@@ -443,23 +424,16 @@ function renderPeriodBadges(type) {
 
 function removePeriod(type, index) {
     if(isPeriodLocked())return;
-    if (type === 'vacation') {
-        vacationPeriods.splice(index, 1);
-        renderPeriodBadges('vacation');
-        syncPeriodInput('vacation');
-    } else {
-        sickPeriods.splice(index, 1);
-        renderPeriodBadges('sick');
-        syncPeriodInput('sick');
-    }
+    if (type !== 'sick') return;
+    sickPeriods.splice(index, 1);
+    renderPeriodBadges('sick');
+    syncPeriodInput('sick');
     updateStats();
 }
 
 function syncPeriodInput(type) {
     if(type==='vacation'&&!isPeriodLocked()){
-        const days=parseDaySet(vacationPeriods.map(p=>p.start===p.end?String(p.start):p.start+'-'+p.end).join(','));
-        for(const day of parseDaySet(periodInfo?.approved_vacation||''))days.add(day);
-        vacationPeriods=periodsFromString(daysToRanges(Array.from(days)));renderPeriodBadges('vacation');
+        vacationPeriods=periodsFromString(approvedVacationRanges());renderPeriodBadges('vacation');
     }
     const periods = type === 'vacation' ? vacationPeriods : sickPeriods;
     const id      = type === 'vacation' ? 'vacation' : 'sick';
@@ -467,49 +441,9 @@ function syncPeriodInput(type) {
     setDateInput(id, value);
 }
 
-/* ── Quick vacation: adds a period of N working days ── */
-function addQuickVacation(workDays) {
-    const { year, month } = getYM();
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const hols = new Set(
-        (getHolidayList(year) || []).filter(h => h.month === month).map(h => h.day)
-    );
-
-    // Days already in existing vacation periods
-    const taken = new Set();
-    vacationPeriods.forEach(p => { for (let d = p.start; d <= p.end; d++) taken.add(d); });
-
-    let start = null, end = null, count = 0;
-
-    for (let d = 1; d <= daysInMonth && count < workDays; d++) {
-        const dow = new Date(year, month - 1, d).getDay();
-        if (dow === 0 || dow === 6 || hols.has(d) || taken.has(d)) continue;
-        if (start === null) start = d;
-        end = d;
-        count++;
-    }
-
-    if (start === null) return;
-
-    vacationPeriods.push({ start, end });
-    renderPeriodBadges('vacation');
-    syncPeriodInput('vacation');
-    setTimeout(updateStats, 80);
-}
-
 /* ── Clear functions ── */
-function syncVacationControls(){
-    const clear=root.querySelector('.absence-card.vacation .btn-clear');if(!clear)return;
-    const approved=parseDaySet(periodInfo?.approved_vacation||'');
-    const optional=Array.from(parseDaySet(byId('vacation').getAttribute('data-value')||'')).some(day=>!approved.has(day));
-    clear.textContent=approved.size?'Clear added dates':'Clear';clear.setAttribute('aria-label',approved.size?'Clear added vacation dates':'Clear vacation periods');
-    clear.disabled=isPeriodLocked()||!optional;
-}
-function clearVacation() {
-    if(isPeriodLocked())return;
-    vacationPeriods = [];
-    syncPeriodInput('vacation');
-    updateStats();
+function approvedVacationRanges(){
+    return daysToRanges(Array.from(parseDaySet(periodInfo?.approved_vacation||'')));
 }
 function clearSick() {
     if(isPeriodLocked())return;
@@ -659,6 +593,7 @@ function renderMonthOverview(scheduledHours){
     const grid=byId('monthOverview');if(!grid)return;
     const {year,month}=getYM();grid.replaceChildren();
     root.querySelector('[data-month-overview-period]').textContent=new Date(year,month-1,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    const now=new Date(),today=root.querySelector('[data-step="today"]');if(today)today.hidden=year===now.getFullYear()&&month===now.getMonth()+1;
     if(isPeriodLocked()&&Math.abs(scheduledHours-periodInfo.timesheet.total_hours)>.001){
         const note=document.createElement('p');note.className='saved-schedule-note';note.textContent='This saved timesheet uses recorded hours. Open the submitted document to see the exact daily breakdown.';grid.append(note);return;
     }
@@ -672,8 +607,73 @@ function renderMonthOverview(scheduledHours){
         const kind=vacation.has(day)?'leave':sick.has(day)?'sick':custom.has(day)?'other':holiday?'holiday':weekend?'weekend':'work';
         const text=approvedOther.get(day)||(kind==='work'?(Number(byId('hours_per_day').value)||8)+'h':{leave:'Leave',sick:'Sick',other:'Other',holiday:'Holiday',weekend:'—'}[kind]);
         const cell=document.createElement('div');cell.className='month-day '+kind;cell.setAttribute('role','listitem');cell.title=holiday||text;cell.setAttribute('aria-label',date.toLocaleDateString('en-GB',{day:'numeric',month:'long',weekday:'long'})+' · '+(holiday&&kind==='holiday'?holiday:text));
-        const number=document.createElement('strong');number.textContent=day;const label=document.createElement('small');label.textContent=text;cell.append(number,label);grid.append(cell);
+        const number=document.createElement('strong');number.textContent=day;const label=document.createElement('small');label.textContent=text;cell.append(number,label);
+        if(!isPeriodLocked()&&(kind==='work'||kind==='sick'||(kind==='other'&&!approvedOther.has(day)))){
+            const pick=document.createElement('button');pick.type='button';pick.className='month-day-pick';
+            pick.setAttribute('aria-haspopup','menu');pick.dataset.day=day;pick.dataset.kind=kind;pick.setAttribute('aria-label','Change '+cell.getAttribute('aria-label'));
+            pick.addEventListener('click',()=>openDayMenu(day,kind,pick));cell.classList.add('editable');cell.append(pick);
+        }
+        grid.append(cell);
     }
+}
+
+/* ── Day menu: mark a day straight from the month grid ── */
+let dayMenu=null;
+function dayDate(day){const {year,month}=getYM();return new Date(year,month-1,day);}
+function closeDayMenu({restoreFocus=false}={}){
+    if(!dayMenu)return;const anchor=dayMenu.anchor;dayMenu.remove();dayMenu=null;
+    document.removeEventListener('pointerdown',dayMenuOutside,true);window.removeEventListener('resize',dismissDayMenu);window.removeEventListener('scroll',positionDayMenu,true);
+    if(restoreFocus&&anchor?.isConnected)anchor.focus();
+}
+function dismissDayMenu(){closeDayMenu();}
+function positionDayMenu(){
+    if(!dayMenu)return;
+    // The grid re-renders on refresh; follow the current cell for the same day.
+    if(!dayMenu.anchor.isConnected){const next=root.querySelector('.month-day-pick[data-day="'+dayMenu.day+'"]');if(!next){closeDayMenu();return;}dayMenu.anchor=next;}
+    const rect=dayMenu.anchor.getBoundingClientRect(),width=dayMenu.offsetWidth,height=dayMenu.offsetHeight;
+    dayMenu.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-width-8))+'px';
+    dayMenu.style.top=(rect.bottom+6+height>window.innerHeight?Math.max(8,rect.top-height-6):rect.bottom+6)+'px';
+}
+function dayMenuOutside(event){if(dayMenu&&!dayMenu.contains(event.target)&&event.target!==dayMenu.anchor)closeDayMenu();}
+function setDayKind(day,kind){
+    if(isPeriodLocked())return;
+    const sick=parseDaySet(byId('sick').getAttribute('data-value')||''),custom=parseDaySet(byId('custom_days').getAttribute('data-value')||'');
+    sick.delete(day);custom.delete(day);
+    if(kind==='sick')sick.add(day);
+    if(kind==='other')custom.add(day);
+    sickPeriods=periodsFromString(daysToRanges(Array.from(sick)));syncPeriodInput('sick');renderPeriodBadges('sick');
+    const dates=Array.from(custom).sort((a,b)=>a-b).map(dayDate);
+    pickers?.customPicker?.setDate(dates,false);setDateInput('custom_days',fmtDates(dates));updateDisplay('custom',dates);
+    saveFormState();updateStats();
+    if(kind==='other'&&!byId('custom_reason').value.trim()){
+        const editor=root.querySelector('.absence-editor');if(editor)editor.open=true;
+        const reason=byId('custom_reason');reason.focus({preventScroll:true});reason.scrollIntoView?.({block:'center'});
+    }
+}
+function openDayMenu(day,kind,anchor){
+    if(dayMenu?.anchor===anchor){closeDayMenu({restoreFocus:true});return;}
+    closeDayMenu();
+    const date=dayDate(day),iso=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    const menu=document.createElement('div');menu.className='day-menu';menu.setAttribute('role','menu');menu.anchor=anchor;menu.day=day;menu.kind=kind;
+    const heading=document.createElement('p');heading.className='day-menu-title';heading.textContent=date.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+    menu.setAttribute('aria-label',heading.textContent);menu.append(heading);
+    const choices=[['work','Working day'],['sick','Sick day'],['other','Other absence']].filter(([value])=>value!==kind);
+    for(const [value,label] of choices){
+        const item=document.createElement('button');item.type='button';item.setAttribute('role','menuitem');item.className='day-menu-item '+value;item.textContent=label;
+        item.addEventListener('click',()=>{closeDayMenu({restoreFocus:value!=='other'});setDayKind(day,value);});menu.append(item);
+    }
+    const leave=document.createElement('button');leave.type='button';leave.setAttribute('role','menuitem');leave.className='day-menu-item leave';leave.textContent='Request leave…';
+    leave.dataset.requestLeave='';leave.dataset.leaveCopy=JSON.stringify({start_date:iso,end_date:iso,leave_type:'Vacation'});
+    leave.addEventListener('click',()=>setTimeout(()=>closeDayMenu()));menu.append(leave);
+    menu.addEventListener('keydown',event=>{
+        const items=Array.from(menu.querySelectorAll('[role=menuitem]')),index=items.indexOf(document.activeElement);
+        if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeDayMenu({restoreFocus:true});}
+        else if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();items[index<0?(event.key==='ArrowDown'?0:items.length-1):(index+(event.key==='ArrowDown'?1:items.length-1))%items.length].focus();}
+        else if(event.key==='Tab')closeDayMenu();
+    });
+    root.append(menu);dayMenu=menu;positionDayMenu();
+    document.addEventListener('pointerdown',dayMenuOutside,true);window.addEventListener('resize',dismissDayMenu);window.addEventListener('scroll',positionDayMenu,true);
+    menu.querySelector('[role=menuitem]').focus();
 }
 
 async function updateStats() {
@@ -683,6 +683,7 @@ async function updateStats() {
     const scheduledHours=s.hours;
     if(isPeriodLocked()){s.hours=periodInfo.timesheet.total_hours;s.working=periodInfo.timesheet.working_days??s.working;}
     renderMonthOverview(scheduledHours);
+    if(dayMenu){const cell=root.querySelector('.month-day-pick[data-day="'+dayMenu.day+'"]');if(!cell||cell.dataset.kind!==dayMenu.kind)closeDayMenu();else{dayMenu.anchor=cell;positionDayMenu();}}
     byId('statTotalDays').textContent     = s.total;
     byId('statWorkingDays').textContent   = s.working;
     byId('statHolidays').textContent      = s.holidays;
@@ -722,7 +723,7 @@ async function updateStats() {
             hours: s.hours,
         }));
     }
-    renderApprovedOther();syncVacationControls();saveFormState();
+    renderApprovedOther();saveFormState();
 }
 
 /* ── Day range formatting ── */
@@ -777,7 +778,9 @@ async function rebuildPeriod(){
 }
 async function reinit(){
   if(periodCursor)saveFormState(periodCursor,true);
+  const step=document.activeElement?.closest?.('[data-step]')?.dataset.step;
   await rebuildPeriod();
+  if(step&&!disposed){const button=root.querySelector('[data-step="'+step+'"]');if(button&&!button.hidden)button.focus();}
   if(!disposed&&root.dataset.viewReady==='ready')window.PeopleWorkspace.periodChanged(root,getYM());
 }
 loadFormState();editorBusy(true);
@@ -785,6 +788,14 @@ const ready=rebuildPeriod().catch(()=>{if(!disposed){editorBusy(false);periodInf
 
 byId('year').addEventListener('change',  reinit);
 byId('month').addEventListener('change', reinit);
+// One stepper replaces separate year/month fields; the hidden fields stay the source of truth.
+root.querySelectorAll('[data-step]').forEach(button=>button.addEventListener('click',()=>{
+    const {year,month}=getYM(),now=new Date();
+    const next=button.dataset.step==='today'?new Date(now.getFullYear(),now.getMonth(),1):new Date(year,month-1+Number(button.dataset.step),1);
+    if(next.getFullYear()<2020||next.getFullYear()>2099||(next.getFullYear()===year&&next.getMonth()+1===month))return;
+    byId('year').value=next.getFullYear();byId('month').value=next.getMonth()+1;
+    byId('month').dispatchEvent(new Event('change',{bubbles:true}));
+}));
 root.querySelectorAll('#timesheetForm [required]').forEach(field => {
     field.addEventListener('invalid', () => field.setCustomValidity(UI.requiredField));
     field.addEventListener('input', () => field.setCustomValidity(''));
@@ -907,10 +918,10 @@ byId('submitBtn').addEventListener('click', async () => {
         renderPeriodStatus();
     }
 });
-const handlers = {clearVacation,clearSick,clearCustom,addQuickVacation,openCalendar,updateGenerateLabel,showPreview,closeCalendar,removePeriod};
+const handlers = {clearSick,clearCustom,openCalendar,updateGenerateLabel,showPreview,closeCalendar,removePeriod};
 return {ready,
   activate(){viewActive=true;Object.assign(window,handlers);watchVisiblePeriod();refreshVisiblePeriod();},
-  pause(){viewActive=false;stopBackgroundRefresh();closeCalendar();saveFormState();},
-  destroy(){disposed=true;viewActive=false;stopBackgroundRefresh();window.removeEventListener('focus',refreshVisiblePeriod);document.removeEventListener('visibilitychange',visibilityChanged);closeCalendar();if(pickers)Object.values(pickers).forEach(p=>p.destroy());}
+  pause(){viewActive=false;stopBackgroundRefresh();closeCalendar();closeDayMenu();saveFormState();},
+  destroy(){disposed=true;viewActive=false;stopBackgroundRefresh();window.removeEventListener('focus',refreshVisiblePeriod);document.removeEventListener('visibilitychange',visibilityChanged);closeCalendar();closeDayMenu();if(pickers)Object.values(pickers).forEach(p=>p.destroy());}
 };
 };

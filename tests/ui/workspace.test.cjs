@@ -290,13 +290,13 @@ test('changing a prior decision starts a fresh comment instead of reusing the ol
 });
 
 
-test('clearing optional absences keeps approved leave and the displayed hours consistent',async()=>{
+test('approved leave is shown read-only and cannot be added by hand',async()=>{
   const app=setup({realTimesheet:true,approvedVacation:'5'});try{
     const {w,d}=app;await until(()=>d.querySelector('#people-view').dataset.viewReady==='ready');
-    const before=d.querySelector('#statExpectedHours').textContent;assert.equal(d.querySelector('#vacation').value,'5');
-    w.clearVacation();await until(()=>d.querySelector('#statExpectedHours').textContent===before);
     assert.equal(d.querySelector('#vacation').value,'5');assert.match(d.querySelector('#vacationDisplay').textContent,/Approved/);
-    assert.equal(d.querySelector('#vacationDisplay .badge-remove'),null);assert.deepEqual(app.errors,[]);
+    assert.equal(d.querySelector('#vacationDisplay .badge-remove'),null);
+    assert.equal(d.querySelector('#vacationPickerInput'),null);assert.equal(w.addQuickVacation,undefined);assert.equal(w.clearVacation,undefined);
+    assert.ok(d.querySelector('.approved-leave-card [data-request-leave]'));assert.deepEqual(app.errors,[]);
   }finally{app.close();}
 });
 
@@ -540,11 +540,12 @@ test('background month refresh pauses while hidden or in another section and res
 test('refresh removes withdrawn approved dates while preserving manually entered absences',async()=>{
   const app=setup({realTimesheet:true,approvedVacation:'12-13',fakeIntervals:true});try{
     const {d,w}=app;await novemberEditor(app);
-    d.querySelector('#vacationPickerInput')._flatpickr.setDate(w.Array.of(new w.Date(2026,10,9),new w.Date(2026,10,9)),true);
-    await until(()=>d.querySelector('#vacation').value==='9,12-13');
+    d.querySelector('#sickPickerInput')._flatpickr.setDate(w.Array.of(new w.Date(2026,10,9),new w.Date(2026,10,9)),true);
+    await until(()=>d.querySelector('#sick').value==='9'&&d.querySelector('#vacation').value==='12-13');
     d.querySelector('#custom_reason').value='Keep the manual draft';
     app.setApprovedVacation('');await w.PeopleWorkspace.navigate('/leave');await w.PeopleWorkspace.navigate('/timesheet');
-    await until(()=>d.querySelector('#vacation').value==='9');
+    await until(()=>d.querySelector('#vacation').value==='');
+    assert.equal(d.querySelector('#sick').value,'9');
     assert.equal(d.querySelector('#custom_reason').value,'Keep the manual draft');
     assert.equal(d.querySelector('#statExpectedHours').textContent,'160 Hours');
     assert.equal(d.querySelector('#vacationDisplay .approved-period'),null);assert.deepEqual(app.errors,[]);
@@ -582,4 +583,44 @@ test('a late background approval response cannot rewrite a document while it is 
     await app.tickIntervals();await until(()=>d.querySelector('#vacation').value==='12-13'&&d.querySelector('#statExpectedHours').textContent==='152 Hours');
     assert.equal(reason.value,'Keep the downloading snapshot');assert.deepEqual(app.errors,[]);
   }finally{finishDownload?.(new Response('%PDF-test',{headers:{'content-type':'application/pdf'}}));app.release();app.close();}
+});
+
+test('a working day can be marked from the month grid and the draft keeps it',async()=>{
+  const app=setup({realTimesheet:true,approvedVacation:'12'});try{
+    const {d,w}=app;await novemberEditor(app);
+    const pick=day=>d.querySelector('.month-day-pick[data-day="'+day+'"]');
+    const choose=async(day,label)=>{pick(day).click();const item=Array.from(d.querySelectorAll('.day-menu-item')).find(node=>node.textContent===label);assert.ok(item,label);item.click();};
+    assert.equal(pick(12),null,'Approved leave is not editable from the grid');assert.equal(pick(14),null,'Weekends are not editable');
+    await choose(17,'Sick day');await until(()=>d.querySelector('#sick').value==='17');
+    assert.match(pick(17).parentElement.className,/sick/);assert.equal(d.querySelectorAll('.day-menu').length,0);
+    await choose(18,'Other absence');await until(()=>d.querySelector('#custom_days').value==='18');
+    assert.equal(d.activeElement,d.querySelector('#custom_reason'));assert.ok(d.querySelector('.absence-editor').open);
+    await choose(17,'Working day');await until(()=>d.querySelector('#sick').value==='');
+    const draft=JSON.parse(w.localStorage.getItem(w.WorkspaceCore.periodDraftKey('1',2026,11)));
+    assert.equal(draft.sick,'');assert.equal(draft.custom_days,'18');assert.equal(draft.vacation,undefined);
+    pick(20).click();const keys=new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true});d.querySelector('.day-menu').dispatchEvent(keys);
+    assert.equal(d.querySelectorAll('.day-menu').length,0);assert.equal(d.activeElement,pick(20));assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
+});
+
+test('a submitted month has no editable days',async()=>{
+  const app=setup({realTimesheet:true,savedSheet:{id:1,status:'submitted',vacation:'',sick:'',custom_days:'',custom_reason:'',format:'pdf',total_hours:168,working_days:21}});try{
+    const {d}=app;await until(()=>d.querySelector('#people-view').dataset.viewReady==='ready');
+    await until(()=>d.querySelectorAll('#monthOverview .month-day').length>0);
+    assert.equal(d.querySelectorAll('.month-day-pick').length,0);
+    assert.equal(d.querySelector('[data-step="1"]').disabled,false,'A submitted month must not trap the stepper');
+    assert.equal(d.querySelector('.approved-leave-card [data-request-leave]').disabled,false);
+    d.querySelector('[data-step="1"]').click();await until(()=>d.querySelector('#month').value==='12');assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
+});
+
+test('the month stepper moves between adjacent periods',async()=>{
+  const app=setup({realTimesheet:true});try{
+    const {d}=app;await novemberEditor(app);
+    const label=()=>d.querySelector('[data-month-overview-period]').textContent;
+    assert.equal(label(),'November 2026');
+    d.querySelector('[data-step="1"]').click();await until(()=>d.querySelector('#month').value==='12'&&label()==='December 2026');
+    d.querySelector('[data-step="-1"]').click();await until(()=>d.querySelector('#month').value==='11'&&label()==='November 2026');
+    assert.equal(d.querySelector('#year').type,'hidden');assert.deepEqual(app.errors,[]);
+  }finally{app.close();}
 });

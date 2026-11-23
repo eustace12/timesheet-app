@@ -5,19 +5,19 @@
 <link rel="stylesheet" href="/static/people-shell.css">
 {% include 'brand_head.html' %}
 </head><body class="people-app" data-demo-role="{{ demo_role }}">
-{% include 'app_shell.html' %}
+{% include 'app_shell.html' %}{% from 'ui_components.html' import withdraw_leave_form with context %}
 <main id="people-view" tabindex="-1"><div class="workspace"><div class="workspace-content">
-<div class="page-heading"><div><p class="eyebrow">A LITTLE ROOM TO RECHARGE</p><h1>Time off</h1><p class="subtle">Your leave, balance and team plans in one place.</p></div><button type="button" class="request-leave-button employee-only" data-request-leave {% if not user %}disabled{% endif %}>+ Request leave</button></div>
+<div class="page-heading"><div><p class="eyebrow">A LITTLE ROOM TO RECHARGE</p><h1>Time off</h1><p class="subtle">Your leave, balance and team plans in one place.</p></div></div>
 {% include 'leave_tabs.html' %}
 <section class="metrics leave-overview" aria-label="Leave balance for {{ year }}">
-<article class="metric"><span>Available balance</span><strong>{{ balance.available if balance and balance.available is not none else '—' }} <small>days</small></strong><p>Ready for your next break</p></article>
+<article class="metric"><span>Available balance</span><strong>{{ balance.available if balance and balance.available is not none else '—' }} <small>days</small></strong><p>{{ 'Ready for your next break' if balance and balance.available is not none else 'Allowance not set yet · ask accounting' }}</p></article>
 <article class="metric"><span>Annual allowance</span><strong>{{ balance.entitlement if balance and balance.entitlement is not none else '—' }} <small>days</small></strong><p>{{ year }} · working days</p></article>
 <article class="metric"><span>Approved</span><strong>{{ balance.used if balance else 0 }} <small>days</small></strong><p>Vacation already approved</p></article>
 <article class="metric"><span>Pending</span><strong>{{ balance.pending if balance else 0 }} <small>days</small></strong><p>Awaiting a review</p></article>
 </section>
 <section class="panel"><div class="panel-heading"><h2>My requests</h2><a href="/team-calendar">View team calendar →</a></div>
 <div class="table-scroll"><table><thead><tr><th>Dates</th><th>Leave type</th><th>Status</th><th>Note</th><th>Actions</th></tr></thead><tbody>
-{% for row in leave_requests %}<tr><td>{{ row.start_date|display_date }} <span class="subtle">→</span> {{ row.end_date|display_date }}</td><td>{{ 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}</td><td><span class="badge {{ row.status }}">{{ {'submitted':'Pending','accepted':'Approved','needs_changes':'Changes requested'}.get(row.status,row.status) }}</span></td><td>{{ row.review_comment or row.comment or '—' }}</td><td><div class="record-links"><a href="/history/leave/{{ row.id }}/download">Download PDF</a>{% if row.status == 'needs_changes' %}<button type="button" class="text-button" data-request-leave data-leave-copy='{{ {"start_date":row.start_date,"end_date":row.end_date,"leave_type":row.leave_type,"comment":row.comment}|tojson }}'>Prepare a revised request →</button>{% endif %}</div></td></tr>
+{% for row in leave_requests %}<tr><td>{{ row.start_date|display_date }} <span class="subtle">→</span> {{ row.end_date|display_date }}</td><td>{{ 'Annual leave' if row.leave_type == 'Vacation' else row.leave_type }}</td><td><span class="badge {{ row.status }}">{{ {'submitted':'Pending','accepted':'Approved','needs_changes':'Changes requested'}.get(row.status,row.status) }}</span></td><td>{{ row.review_comment or row.comment or '—' }}</td><td><div class="record-links"><a href="/history/leave/{{ row.id }}/download">Download PDF</a>{{ withdraw_leave_form(row, '/leave') }}{% if row.status == 'needs_changes' %}<button type="button" class="text-button" data-request-leave data-leave-copy='{{ {"start_date":row.start_date,"end_date":row.end_date,"leave_type":row.leave_type,"comment":row.comment}|tojson }}'>Prepare a revised request →</button>{% endif %}</div></td></tr>
 {% else %}<tr><td colspan="5" class="empty"><strong>Your next break starts here.</strong><p>When you request leave, you can follow its status here.</p><button class="request-leave-button" type="button" data-request-leave {% if not user %}disabled{% endif %}>Request leave</button></td></tr>{% endfor %}
 </tbody></table></div></section>
 </div></div></main></body></html>

@@ -11,12 +11,19 @@ import sys
 from urllib.parse import parse_qs, unquote, urlsplit
 
 EXPECTED_REF = 'rdoamaeixdzkddvnlvto'
-OFFICE = '--office' in sys.argv
-EXPECTED_SHA = ('b5b0b42c5cabba470659108391f9eeb800b85a67dd4ce1f278bd62256c532d43' if OFFICE
-                else 'd61f41b78dafa7c800c373398c4549b9c6434bce13c976b72f63a199ca599a6a')
+RELEASES = {
+    '--office': ('20261102164908_office_plans.sql',
+                 'b5b0b42c5cabba470659108391f9eeb800b85a67dd4ce1f278bd62256c532d43'),
+    '--withdrawal': ('20261123120000_leave_withdrawal.sql',
+                     '9c9ab7603db03db36a384fea7aaf96afd9e576c847eeb70fe7637288c7f5f8b0'),
+}
+selected = [flag for flag in RELEASES if flag in sys.argv]
+if len(selected) > 1:
+    raise SystemExit('Apply one release migration at a time.')
+MIGRATION_NAME, EXPECTED_SHA = (RELEASES[selected[0]] if selected else
+    ('20261102160704_workflow_integrity.sql', 'd61f41b78dafa7c800c373398c4549b9c6434bce13c976b72f63a199ca599a6a'))
 root = Path(__file__).resolve().parents[1]
-migration = root / ('supabase/migrations/20261102164908_office_plans.sql' if OFFICE
-                    else 'supabase/migrations/20261102160704_workflow_integrity.sql')
+migration = root / 'supabase/migrations' / MIGRATION_NAME
 url = urlsplit(os.environ['SUPABASE_URL'])
 connection = urlsplit(os.environ['POSTGRES_URL'])
 username = unquote(connection.username or '')
@@ -38,6 +45,7 @@ select 'snapshot_column='||count(*) from information_schema.columns
 where table_schema='public' and table_name='timesheets' and column_name='leave_snapshot';
 select 'workflow_events='||coalesce(to_regclass('public.workflow_events')::text,'absent');
 select 'office_plans='||coalesce(to_regclass('public.office_plans')::text,'absent');
+select 'withdraw_rpc='||count(*) from pg_proc where proname = 'withdraw_leave_atomic';
 select 'anonymous_rpc='||count(*) from information_schema.routine_privileges
 where routine_schema='public' and routine_name like '%_atomic' and grantee in ('PUBLIC','anon','authenticated');
 """
